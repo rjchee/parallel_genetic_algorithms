@@ -6,7 +6,7 @@ We are going to implement parallelized genetic algorithms on NVIDIA GeForce 1080
 
 ### BACKGROUND
 Genetic Algorithms (GAs) are widely used in many applications and are often times computationally expensive. Although GAs are typically done in an iterative way, the computation within each generation is inherently parallel (Figure 1).
-![Figure 1.General Evolutionary Process of GA](evolutionary_process.png)
+![Figure 1.General Evolutionary Process of GA](evolutionary_process.jpeg)
 
 This pipelined process is very similar to graphics pipeline on GPU and might benefit a lot from parallelism. So we decide to implement the evolutionary process in parallel, with different genetic operators and using different programming models.
 
