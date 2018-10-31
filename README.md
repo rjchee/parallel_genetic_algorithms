@@ -39,6 +39,6 @@ Having trouble with Pages? Check out our [documentation](https://help.github.com
 ## Parallelizing Genetic Algorithms on GPU
 ### _By Shihao, Raymond_
 
-- [Proposal](proposal.md) ([PDF](https://docs.google.com/document/d/1FuETlqpjyy-K7FtXaVQ7abZ9iziR9jqVFm-xh18thMU/edit?ts=5bd875e0))
+- [Proposal](proposal.md) ([PDF](proposal.pdf))
 - Checkpoint
 - Final
