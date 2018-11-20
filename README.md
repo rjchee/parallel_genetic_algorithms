@@ -40,5 +40,5 @@ Having trouble with Pages? Check out our [documentation](https://help.github.com
 ### _By Shihao, Raymond_
 
 - [Proposal](proposal.md) ([PDF](proposal.pdf))
-- Checkpoint
+- [Checkpoint](checkpoint.md) ([PDF](checkpoint.pdf))
 - Final
