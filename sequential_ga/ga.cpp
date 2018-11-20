@@ -1,18 +1,18 @@
 #include "ga.h"
 #include <algorithm>
+#include <getopt.h>
 #include <stdlib.h>
 #include <time.h>
 #include <stdio.h>
 
 #include "CycleTimer.h"
 
-#define DEBUG false
-
-#define POPULATION_SIZE 10000
-#define NUM_GENES 100
-#define MUTATION_PROB 0.05
-#define NUM_TRIALS 5
-#define NUM_GENERATIONS 100
+static bool debug = false;
+static size_t population_size = 10000;
+static size_t num_genes = 100;
+static float mutation_prob = 0.05;
+static int num_trials = 5;
+static int num_generations = 100;
 
 static population_t * initPopulation();
 static void printPopulation(population_t * population);
@@ -25,11 +25,76 @@ static int *generateRoulette(population_t * population);
 static int rouletteSelect(int * roulette, int n);
 static void cleanupPopulation(population_t *population);
 
+void usage(const char* progname) {
+    printf("Usage: %s [options]\n", progname);
+    printf("Program Options:\n");
+    printf("  -p  --populationsize <INT>   Number of members of the population\n");
+    printf("  -g  --numgenes <INT>         Number of genes each member of the population has\n");
+    printf("  -m  --mutationprob <DOUBLE>  Probability for a gene to mutate\n");
+    printf("  -t  --numtrials <INT>        Number of times to run the genetic algorithm\n");
+    printf("  -n  --numgenerations <INT>   Max number of generations to grow\n");
+    printf("  -?  --help                   This message\n");
+}
 
-int main(int argc, const char *argv[]) {
+
+int main(int argc, char *argv[]) {
+    int opt;
+    static struct option long_options[] = {
+        {"populationsize", 1, NULL, 'p'},
+        {"numgenes", 1, NULL, 'g'},
+        {"mutationprob", 1, NULL, 'm'},
+        {"numtrials", 1, NULL, 't'},
+        {"numgenerations", 1, NULL, 'n'},
+        {"debug", 0, NULL, 'd'},
+        {"help", 0, NULL, '?'},
+        {0, 0, 0, 0}
+    };
+
+    while ((opt = getopt_long(argc, argv, "?p:g:m:t:n:d", long_options, NULL)) != EOF) {
+        switch (opt) {
+            case 'p':
+                population_size = atoi(optarg);
+                if (population_size % 2 != 0) {
+                    printf("population size must be even!\n");
+                    return 1;
+                }
+                if (population_size <= 0) {
+                    printf("population size must be positive!\n");
+                }
+                break;
+            case 'g':
+                num_genes = atoi(optarg);
+                if (num_genes <= 0) {
+                    printf("population size must be positive!\n");
+                }
+                break;
+            case 'm':
+                mutation_prob = atof(optarg);
+                if (mutation_prob < 0 || mutation_prob > 1) {
+                    printf("mutation probability must be a valid probability!\n");
+                }
+                break;
+            case 't':
+                num_trials = atoi(optarg);
+                if (num_trials <= 0) {
+                    printf("number of trials must be positive!\n");
+                }
+                break;
+            case 'n':
+                num_generations = atoi(optarg);
+                break;
+            case 'd':
+                debug = true;
+                break;
+            case '?':
+                usage(argv[0]);
+                return 0;
+        }
+    }
+
     srand(time(NULL));
     double minTime = 1e30;
-    for (int i = 0; i < NUM_TRIALS; i++) {
+    for (int i = 0; i < num_trials; i++) {
         population_t * population = initPopulation();
         printPopulation(population);
         population_t * buffer = initPopulation();
@@ -37,7 +102,7 @@ int main(int argc, const char *argv[]) {
 
         double startTime = CycleTimer::currentSeconds();
         int generation;
-        for (generation = 0; generation < NUM_GENERATIONS; generation++) {
+        for (generation = 0; generation != num_generations; generation++) {
             printPopulation(population);
             generateOffsprings(population, buffer);
             if (converged(population)) {
@@ -50,7 +115,7 @@ int main(int argc, const char *argv[]) {
         double endTime = CycleTimer::currentSeconds();
         double totalTime = endTime - startTime;
         int fitness = evaluate(population);
-        if (generation < NUM_GENERATIONS) {
+        if (generation != num_generations) {
             printf("converge at generation #%d\n", generation);
         }
         printf("trial %d: %.4f seconds, fitness: %d\n", i, totalTime, fitness);
@@ -74,7 +139,7 @@ static int evaluate(population_t * population) {
 }
 
 static bool converged(population_t *population) {
-    return evaluate(population) == POPULATION_SIZE * NUM_GENES;
+    return evaluate(population) == (int)(population_size * num_genes);
 }
 
 static int evaluateFitness(chromosome_t *chromo) {
@@ -157,15 +222,15 @@ static int rouletteSelect(int * roulette, int n) {
 
 static population_t * initPopulation() {
     population_t * population = (population_t *) malloc(sizeof(population_t));
-    population->size = POPULATION_SIZE;
-    population->mutationProb = MUTATION_PROB;
-    population->chromosomes = (chromosome_t *) malloc(sizeof(chromosome_t) * POPULATION_SIZE);
+    population->size = population_size;
+    population->mutationProb = mutation_prob;
+    population->chromosomes = (chromosome_t *) malloc(sizeof(chromosome_t) * population_size);
 
     chromosome_t *chromos = population->chromosomes;
-    for (int i = 0; i < POPULATION_SIZE; i++) {
-        chromos[i].numOfGenes = NUM_GENES;
-        chromos[i].genes = (gene_t *) malloc(sizeof(gene_t) * NUM_GENES);
-        for (int j = 0; j < NUM_GENES; j++) {
+    for (size_t i = 0; i < population_size; i++) {
+        chromos[i].numOfGenes = num_genes;
+        chromos[i].genes = (gene_t *) malloc(sizeof(gene_t) * num_genes);
+        for (size_t j = 0; j < num_genes; j++) {
             chromos[i].genes[j].val = rand() % 2;
         }
         chromos[i].fitness = 0;
@@ -175,7 +240,7 @@ static population_t * initPopulation() {
 
 
 static void cleanupPopulation(population_t *population) {
-    for (int i = 0; i < POPULATION_SIZE; i++) {
+    for (size_t i = 0; i < population_size; i++) {
         free(population->chromosomes[i].genes);
     }
     free(population->chromosomes);
@@ -184,11 +249,11 @@ static void cleanupPopulation(population_t *population) {
 
 
 static void printPopulation(population_t * population) {
-    if (DEBUG) {
+    if (debug) {
         chromosome_t *chromos = population->chromosomes;
-        for (int i = 0; i < POPULATION_SIZE; i++) {
-            printf("chromosome %d: [", i);
-            for (int j = 0; j < NUM_GENES; j++) {
+        for (size_t i = 0; i < population_size; i++) {
+            printf("chromosome %lu: [", i);
+            for (size_t j = 0; j < num_genes; j++) {
                 printf("%d, ", chromos[i].genes[j].val);
             }
             printf("] fitness: %d\n", chromos[i].fitness);
