@@ -1,5 +1,9 @@
 APP_NAME=ga
 
+CXX=g++
+CXXFLAGS=-m64 -std=c++11 -I. -I../common -O3 -Wall
+
+COMMONDIR=../common
 OBJS=ga.o
 
 default: $(APP_NAME)
@@ -7,7 +11,7 @@ default: $(APP_NAME)
 
 # Compile for CPU
 cpu: CXX = g++ -m64 -std=c++11
-cpu: CXXFLAGS = -I. -O3 -Wall -fopenmp -Wno-unknown-pragmas
+cpu: CXXFLAGS = -I. -I../common -O3 -Wall -fopenmp -Wno-unknown-pragmas
 
 # Compilation Rules
 $(APP_NAME): $(OBJS)
@@ -16,7 +20,7 @@ $(APP_NAME): $(OBJS)
 cpu: $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $(APP_NAME) $(OBJS)
 
-%.o: %.cpp
+%.o: %.cpp $(COMMONDIR)/CycleTimer.h
 	$(CXX) $< $(CXXFLAGS) -c -o $@
 
 
