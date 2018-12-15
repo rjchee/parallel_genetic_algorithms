@@ -105,6 +105,9 @@ int main(int argc, char *argv[]) {
         for (generation = 0; generation != num_generations; generation++) {
             printPopulation(population);
             generateOffsprings(population, buffer);
+            population_t *tmp = population;
+            population = buffer;
+            buffer = tmp;
             if (converged(population)) {
                 printPopulation(population);
                 break;
@@ -162,10 +165,6 @@ static void generateOffsprings(population_t * population, population_t * buffer)
     }
 
     free(roulette);
-
-    population_t * tmp = population;
-    population = buffer;
-    buffer = tmp;
 }
 
 static void crossover(population_t * population, population_t * buffer, int index, int p1, int p2) {
