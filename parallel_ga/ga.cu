@@ -48,8 +48,8 @@ __device__ void printPopulation(population_t * population) {
     int numChromosomes = population->numChromosomes;
     int genesPerChromosome = population->genesPerChromosome;
     for (size_t i = 0; i < numChromosomes; i++) {
-        int startGene = chromos[i].geneIdx;
-        int endGene = startGene + genesPerChromosome;
+        size_t startGene = chromos[i].geneIdx;
+        size_t endGene = startGene + genesPerChromosome;
         printf("chromosome %lu: fitness: %d [", i, chromos[i].fitness);
         for (size_t j = startGene; j < endGene; j++) {
             printf("%d, ", genes[j].val);
@@ -214,7 +214,7 @@ __global__ void gaKernel(curandState_t *states, population_t *population, popula
         *totalFitness = population->totalFitness;
         if (hasConverged) {
             printf("converged\n");
-            return;
+            break;
         }
         __syncthreads();
         if (debug && threadID == 0) {
