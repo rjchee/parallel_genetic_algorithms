@@ -216,6 +216,11 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
     int rouletteBytes = (population->numChromosomes + 1) * sizeof(int);
     cudaMalloc(&cudaRoulette, rouletteBytes);
 
+    cudaError_t errCode = cudaPeekAtLastError();
+    if (errCode != cudaSuccess) {
+        fprintf(stderr, "WARNING: A CUDA error occured: code=%d, %s\n", errCode, cudaGetErrorString(errCode));
+    }
+
     curandState_t *states;
     int curandStateBytes = blocks * THREADS_PER_BLOCK * sizeof(curandState_t);
     cudaMalloc(&states, curandStateBytes);
@@ -223,8 +228,15 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
     setupCurand<<<blocks, numThreads>>>(states, seed);
     cudaThreadSynchronize();
 
+    errCode = cudaPeekAtLastError();
+    if (errCode != cudaSuccess) {
+        fprintf(stderr, "WARNING: A CUDA error occured: code=%d, %s\n", errCode, cudaGetErrorString(errCode));
+    }
+
     int *cudaResult;
     cudaMalloc(&cudaResult, sizeof(int));
+
+    printf("Starting the genetic algorithm\n");
 
     double startTime = CycleTimer::currentSeconds();
 
@@ -237,7 +249,7 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
 
     double endTime = CycleTimer::currentSeconds();
 
-    cudaError_t errCode = cudaPeekAtLastError();
+    errCode = cudaPeekAtLastError();
     if (errCode != cudaSuccess) {
         fprintf(stderr, "WARNING: A CUDA error occured: code=%d, %s\n", errCode, cudaGetErrorString(errCode));
     }
