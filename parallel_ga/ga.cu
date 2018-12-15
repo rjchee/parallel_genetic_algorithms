@@ -54,7 +54,7 @@ __device__ int evaluate(int threadID, population_t *population) {
 __device__ bool converged(int threadID, population_t *population) {
     int totalFitness = evaluate(threadID, population);
     population->totalFitness = totalFitness;
-    return totalFitness == POPULATION_SIZE * NUM_GENES;
+    return totalFitness == population->numChromosomes * population->numGenes;
 }
 
 
@@ -64,7 +64,7 @@ __device__ int evaluateFitness(int threadID, population_t *population, int chrom
     int endGene = startGene + chromosome->numOfGenes;
     int val = 0;
     for (int i = startGene; i < endGene; i++) {
-        val += population->genes[i];
+        val += population->genes[i].val;
     }
     chromosome->fitness = val;
     return val;
