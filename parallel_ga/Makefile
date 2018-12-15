@@ -1,29 +1,49 @@
-APP_NAME=ga
 
-CXX=g++
-CXXFLAGS=-m64 -std=c++11 -I. -I../common -O3 -Wall
+EXECUTABLE := ga
 
-COMMONDIR=../common
-OBJS=ga.o
+CU_FILES   := ga.cu
 
-default: $(APP_NAME)
+CU_DEPS    :=
+
+CC_FILES   := main.cpp
+
+###########################################################
+
+ARCH=$(shell uname | sed -e 's/-.*//g')
+
+OBJDIR=objs
+CXX=g++ -m64
+CXXFLAGS=-O3 -Wall
+ifeq ($(ARCH), Darwin)
+# Building on mac
+LDFLAGS=-L/usr/local/depot/cuda-8.0/lib/ -lcudart
+else
+# Building on Linux
+LDFLAGS=-L/usr/local/depot/cuda-8.0/lib64/ -lcudart
+endif
+NVCC=nvcc
+NVCCFLAGS=-O3 -m64 --gpu-architecture compute_35
+COMMON_DIR=../common
 
 
-# Compile for CPU
-cpu: CXX = g++ -m64 -std=c++11
-cpu: CXXFLAGS = -I. -I../common -O3 -Wall -fopenmp -Wno-unknown-pragmas
+OBJS=$(OBJDIR)/main.o  $(OBJDIR)/ga.o
 
-# Compilation Rules
-$(APP_NAME): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $(OBJS)
 
-cpu: $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $(APP_NAME) $(OBJS)
+.PHONY: dirs clean
 
-%.o: %.cpp $(COMMONDIR)/CycleTimer.h
-	$(CXX) $< $(CXXFLAGS) -c -o $@
+default: $(EXECUTABLE)
 
+dirs:
+		mkdir -p $(OBJDIR)/
 
 clean:
-	/bin/rm -rf *~ *.o $(APP_NAME)
+		rm -rf $(OBJDIR) *.ppm *~ $(EXECUTABLE)
 
+$(EXECUTABLE): dirs $(OBJS)
+		$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS)
+
+$(OBJDIR)/%.o: %.cpp $(COMMONDIR)/CycleTimer.h
+		$(CXX) $< $(CXXFLAGS) -c -o $@
+
+$(OBJDIR)/%.o: %.cu
+		$(NVCC) $< $(NVCCFLAGS) -c -o $@
