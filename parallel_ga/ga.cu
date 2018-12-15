@@ -8,13 +8,12 @@
 
 #include "CycleTimer.h"
 
-#define NUM_GENERATIONS 100
-
 #define THREADS_PER_BLOCK 256
 
 // TODO: check if buffer's mutationProb, numChromosomes, and numGenes are initialized correctly
 // TODO: store copies of heavily accessed shared memory to local memory
 
+__global__ void printPopulation(population_t *population);
 static void cudaInitPopulation(population_t *hostPopulation, population_t *cudaPopulation);
 __device__ bool converged(int threadID, population_t *population);
 __device__ int evaluate(population_t *population);
@@ -23,8 +22,25 @@ __device__ void generateOffsprings(int threadID, curandState_t *state, populatio
 __device__ void crossover(curandState_t *state, population_t *population, population_t *buffer, int index, int pc1, int pc2);
 __device__ void generateRoulette(int threadID, population_t * population, int *roulette);
 __device__ int rouletteSelect(curandState_t *state, int * roulette, int n);
-__global__ void gaKernel(curandState_t *states, population_t population, population_t buffer, int *roulette);
+__global__ void gaKernel(curandState_t *states, population_t population, population_t buffer, int *roulette, int num_generations, bool debug);
 __global__ void setupCurand(curandState_t *state, unsigned long long seed_offset);
+
+
+__global__ void printPopulation(population_t * population) {
+    chromosome_t *chromos = population->chromosomes;
+    gene_t *genes = population->genes;
+    int numChromosomes = population->numChromosomes;
+    int genesPerChromosome = population->genesPerChromosome;
+    for (size_t i = 0; i < numChromosomes; i++) {
+        int startGene = chromos[i].geneIdx;
+        int endGene = startGene + genesPerChromosome;
+        printf("chromosome %lu: fitness: %d [", i, chromos[i].fitness);
+        for (size_t j = startGene; j < endGene; j++) {
+            printf("%d, ", genes[j].val);
+        }
+        printf("]\n");
+    }
+}
 
 static void cudaInitPopulation(population_t *hostPopulation, population_t *cudaPopulation) {
     size_t chromosomeBytes = hostPopulation->numChromosomes * sizeof(chromosome_t);
@@ -87,13 +103,6 @@ __device__ void generateOffsprings(int threadID, curandState_t *state, populatio
         // printf("crossover %d & %d to generate %d & %d\n", parent1, parent2, i, i + 1);
         crossover(state, population, buffer, i * 2, parent1, parent2);
     }
-
-    __syncthreads();
-    if (threadID == 0) {
-        population_t * tmp = population;
-        population = buffer;
-        buffer = tmp;
-    }
 }
 
 
@@ -152,15 +161,25 @@ __device__ int rouletteSelect(curandState_t *state, int *roulette, int size) {
     return -1;
 }
 
-__global__ void gaKernel(curandState_t *states, population_t population, population_t buffer, int *roulette) {
+__global__ void gaKernel(curandState_t *states, population_t population, population_t buffer, int *roulette, int num_generations, bool debug) {
     int threadID = blockDim.x * blockIdx.x + threadIdx.x;
     curandState_t threadState = states[threadID];
-    for (int generation = 0; generation < NUM_GENERATIONS; generation++) {
+    for (int generation = 0; generation < num_generations; generation++) {
         generateOffsprings(threadID, &threadState, &population, &buffer, roulette);
+        __syncthreads();
+        if (threadID == 0) {
+            population_t tmp = population;
+            population = buffer;
+            buffer = tmp;
+        }
+        __syncthreads();
         if (converged(threadID, &population)) {
             break;
         }
         __syncthreads();
+        if (debug && threadID == 0) {
+            printPopulation(&population);
+        }
     }
 }
 
@@ -171,7 +190,7 @@ __global__ void setupCurand(curandState_t *state, unsigned long long seed_offset
 }
 
 
-void gaCuda(population_t *population, population_t *buffer) {
+void gaCuda(population_t *population, population_t *buffer, int num_generations, bool debug) {
     const int numThreads = THREADS_PER_BLOCK;
     const int blocks = (population->numChromosomes + numThreads - 1) / numThreads;
 
@@ -198,7 +217,7 @@ void gaCuda(population_t *population, population_t *buffer) {
 
     double startTime = CycleTimer::currentSeconds();
 
-    gaKernel<<<blocks, THREADS_PER_BLOCK>>>(states, cudaPopulation, cudaBuffer, cudaRoulette);
+    gaKernel<<<blocks, THREADS_PER_BLOCK>>>(states, cudaPopulation, cudaBuffer, cudaRoulette, num_generations, debug);
     cudaThreadSynchronize();
     int totalFitness;
     cudaMemcpy(cudaResult, &totalFitness, sizeof(int), cudaMemcpyDeviceToHost);
@@ -208,6 +227,13 @@ void gaCuda(population_t *population, population_t *buffer) {
     cudaError_t errCode = cudaPeekAtLastError();
     if (errCode != cudaSuccess) {
         fprintf(stderr, "WARNING: A CUDA error occured: code=%d, %s\n", errCode, cudaGetErrorString(errCode));
+    }
+
+    printPopulation<<<1, 1>>>(cudaPopulation);
+
+    errCode = cudaPeekAtLastError();
+    if (errCode != cudaSuccess) {
+        fprintf(stderr, "WARNING: A CUDA error occured in printing: code=%d, %s\n", errCode, cudaGetErrorString(errCode));
     }
 
     double duration = endTime - startTime;
