@@ -172,7 +172,8 @@ __global__ void setupCurand(curandState *state, unsigned long long seed_offset) 
 
 
 void gaCuda(population_t *population, population_t *buffer) {
-    const int blocks = (population->numChromosomes + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    const int numThreads = THREADS_PER_BLOCK;
+    const int blocks = (population->numChromosomes + numThreads - 1) / numThreads;
 
     population_t cudaPopulation;
     population_t cudaBuffer;
