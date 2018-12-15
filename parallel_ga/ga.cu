@@ -225,6 +225,7 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
 
     population_t *cudaPopulation = cudaInitPopulation(population);
     population_t *cudaBuffer = cudaInitPopulation(buffer);
+    printf("Initialized populations\n");
 
     // array holding the integers used in the roulette function used in
     // generating new offspring
@@ -238,6 +239,7 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
     unsigned long long seed = CycleTimer::currentTicks();
     setupCurand<<<blocks, numThreads>>>(states, seed);
     cudaCheckError( cudaThreadSynchronize() );
+    printf("Initialized curand states\n");
 
     int *cudaResult;
     cudaCheckError( cudaMalloc(&cudaResult, sizeof(int)) );

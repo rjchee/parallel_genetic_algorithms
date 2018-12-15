@@ -86,6 +86,7 @@ int main(int argc, char *argv[]) {
 
     srand(CycleTimer::currentTicks());
     for (int trial = 0; trial < num_trials; trial++) {
+        printf("Starting trial %d\n", trial + 1);
         population_t *population = initPopulation();
         population_t *buffer = initPopulation();
 
