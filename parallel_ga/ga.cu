@@ -190,7 +190,7 @@ void gaCuda(population_t *population, population_t *buffer) {
     int curandStateBytes = blockDim.x * THREADS_PER_BLOCK * sizeof(curandState_t);
     cudaMalloc(&states, curandStateBytes);
     unsigned long long seed = CycleTimer::currentTicks();
-    setupCurand<<blocks, numThreads>>(states, seed);
+    setupCurand<<<blocks, numThreads>>>(states, seed);
     cudaThreadSynchronize();
 
     int *cudaResult;
@@ -198,7 +198,7 @@ void gaCuda(population_t *population, population_t *buffer) {
 
     double startTime = CycleTimer::currentSeconds();
 
-    gaKernel<<blocks, THREADS_PER_BLOCKS>>(states, cudaPopulation, cudaBuffer, cudaRoulette);
+    gaKernel<<<blocks, THREADS_PER_BLOCKS>>>(states, cudaPopulation, cudaBuffer, cudaRoulette);
     cudaThreadSynchronize();
     int totalFitness;
     cudaMemcpy(cudaResult, &totalFitness, sizeof(int), cudaMemcpyDeviceToHost);
