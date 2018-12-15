@@ -102,13 +102,14 @@ static population_t * initPopulation() {
     population->genesPerChromosome = num_genes;
     population->mutationProb = mutation_prob;
     population->chromosomes = (chromosome_t *) malloc(sizeof(chromosome_t) * population->numChromosomes);
-    population->genes = (gene_t *) malloc(sizeof(gene_t) * population->numChromosomes * population->genesPerChromosome);
+    int totalNumGenes = population->numChromosomes * population->genesPerChromosome;
+    population->genes = (gene_t *) malloc(sizeof(gene_t) * totalNumGenes);
 
     chromosome_t *chromos = population->chromosomes;
     for (int i = 0; i < population->numChromosomes; i++) {
         chromos[i].geneIdx = i * num_genes;
         gene_t *genes = &population->genes[chromos[i].geneIdx];
-        for (int j = 0; j < population->numGenes; j++) {
+        for (int j = 0; j < totalNumGenes; j++) {
             genes[j].val = rand() % 2;
         }
         chromos[i].fitness = 0;
