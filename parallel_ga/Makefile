@@ -42,8 +42,8 @@ clean:
 $(EXECUTABLE): dirs $(OBJS)
 		$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS)
 
-$(OBJDIR)/%.o: %.cpp $(COMMONDIR)/CycleTimer.h
+$(OBJDIR)/%.o: %.cpp $(COMMON_DIR)/CycleTimer.h
 		$(CXX) $< $(CXXFLAGS) -c -o $@
 
-$(OBJDIR)/%.o: %.cu $(COMMONDIR)/CycleTimer.h
+$(OBJDIR)/%.o: %.cu $(COMMON_DIR)/CycleTimer.h
 		$(NVCC) $< $(NVCCFLAGS) -c -o $@
