@@ -13,7 +13,7 @@
 // TODO: check if buffer's mutationProb, numChromosomes, and numGenes are initialized correctly
 // TODO: store copies of heavily accessed shared memory to local memory
 
-__global__ void printPopulation(population_t *population);
+__device__ void printPopulation(population_t *population);
 static population_t *cudaInitPopulation(population_t *hostPopulation);
 __device__ bool converged(int threadID, population_t *population);
 __device__ int evaluate(population_t *population);
@@ -191,7 +191,7 @@ __global__ void gaKernel(curandState_t *states, population_t *population, popula
         }
         __syncthreads();
         if (debug && threadID == 0) {
-            printPopulation<<<1, 1>>>(population);
+            printPopulation(population);
         }
     }
 }
@@ -238,13 +238,6 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
     cudaError_t errCode = cudaPeekAtLastError();
     if (errCode != cudaSuccess) {
         fprintf(stderr, "WARNING: A CUDA error occured: code=%d, %s\n", errCode, cudaGetErrorString(errCode));
-    }
-
-    printPopulation<<<1, 1>>>(cudaPopulation);
-
-    errCode = cudaPeekAtLastError();
-    if (errCode != cudaSuccess) {
-        fprintf(stderr, "WARNING: A CUDA error occured in printing: code=%d, %s\n", errCode, cudaGetErrorString(errCode));
     }
 
     double duration = endTime - startTime;
