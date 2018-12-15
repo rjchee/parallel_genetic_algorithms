@@ -86,6 +86,9 @@ __device__ int evaluate(int threadID, population_t *population) {
     int chromosomesPerThread = (population->numChromosomes + THREADS_PER_BLOCK - 1) / (THREADS_PER_BLOCK);
     int startIdx = threadID  * chromosomesPerThread;
     int endIdx = startIdx + chromosomesPerThread;
+    if (startIdx > population->numChromosomes) {
+        startIdx = population->numChromosomes;
+    }
     if (endIdx > population->numChromosomes) {
         endIdx = population->numChromosomes;
     }
