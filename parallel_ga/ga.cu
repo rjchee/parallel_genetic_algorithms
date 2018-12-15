@@ -189,7 +189,7 @@ void gaCuda(population_t *population, population_t *buffer) {
     curandState_t *states;
     int curandStateBytes = blockDim.x * THREADS_PER_BLOCK * sizeof(curandState_t);
     cudaMalloc(&states, curandStateBytes);
-    setupCurand<<blocks, THREADS_PER_BLOCK>>(states, CycleTimer::currentTicks());
+    setupCurand<<blocks, numThreads>>(states, CycleTimer::currentTicks());
     cudaThreadSynchronize();
 
     int *cudaResult;
