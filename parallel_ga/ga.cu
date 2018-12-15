@@ -10,6 +10,22 @@
 
 #define THREADS_PER_BLOCK 256
 
+#define DEBUG
+#ifdef DEBUG
+#define cudaCheckError(ans) cudaAssert((ans), __FILE__, __LINE__);
+inline void cudaAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+    if (code != cudaSuccess)
+    {
+        fprintf(stderr, "CUDA Error: %s at %s:%d\n",
+                cudaGetErrorString(code), file, line);
+        if (abort) exit(code);
+    }
+}
+#else
+#define cudaCheckError(ans) ans
+#endif
+
 // TODO: check if buffer's mutationProb, numChromosomes, and numGenes are initialized correctly
 // TODO: store copies of heavily accessed shared memory to local memory
 
@@ -45,24 +61,24 @@ __device__ void printPopulation(population_t * population) {
 
 static population_t *cudaInitPopulation(population_t *hostPopulation) {
     population_t *cudaPopulation;
-    cudaMalloc(&cudaPopulation, sizeof(population_t));
+    cudaCheckError( cudaMalloc(&cudaPopulation, sizeof(population_t)) );
     population_t tmpPopulation = *hostPopulation;
     size_t chromosomeBytes = hostPopulation->numChromosomes * sizeof(chromosome_t);
-    cudaMalloc(&tmpPopulation.chromosomes, chromosomeBytes);
+    cudaCheckError( cudaMalloc(&tmpPopulation.chromosomes, chromosomeBytes) );
     size_t geneBytes = hostPopulation->numChromosomes * hostPopulation->genesPerChromosome * sizeof(gene_t);
-    cudaMalloc(&tmpPopulation.genes, geneBytes);
-    cudaMemcpy(tmpPopulation.chromosomes, hostPopulation->chromosomes, chromosomeBytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(tmpPopulation.genes, hostPopulation->genes, geneBytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(cudaPopulation, &tmpPopulation, sizeof(population_t), cudaMemcpyHostToDevice);
+    cudaCheckError( cudaMalloc(&tmpPopulation.genes, geneBytes) );
+    cudaCheckError( cudaMemcpy(tmpPopulation.chromosomes, hostPopulation->chromosomes, chromosomeBytes, cudaMemcpyHostToDevice) );
+    cudaCheckError( cudaMemcpy(tmpPopulation.genes, hostPopulation->genes, geneBytes, cudaMemcpyHostToDevice) );
+    cudaCheckError( cudaMemcpy(cudaPopulation, &tmpPopulation, sizeof(population_t), cudaMemcpyHostToDevice) );
     return cudaPopulation;
 }
 
 static void cudaFreePopulation(population_t *cudaPopulation) {
     population_t hostPopulation;
-    cudaMemcpy(&hostPopulation, cudaPopulation, sizeof(population_t), cudaMemcpyDeviceToHost);
-    cudaFree(hostPopulation.chromosomes);
-    cudaFree(hostPopulation.genes);
-    cudaFree(cudaPopulation);
+    cudaCheckError( cudaMemcpy(&hostPopulation, cudaPopulation, sizeof(population_t), cudaMemcpyDeviceToHost) );
+    cudaCheckError( cudaFree(hostPopulation.chromosomes) );
+    cudaCheckError( cudaFree(hostPopulation.genes) );
+    cudaCheckError( cudaFree(cudaPopulation) );
 }
 
 __device__ int evaluate(int threadID, population_t *population) {
@@ -214,27 +230,17 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
     // generating new offspring
     int *cudaRoulette;
     int rouletteBytes = (population->numChromosomes + 1) * sizeof(int);
-    cudaMalloc(&cudaRoulette, rouletteBytes);
-
-    cudaError_t errCode = cudaPeekAtLastError();
-    if (errCode != cudaSuccess) {
-        fprintf(stderr, "WARNING: A CUDA error occured: code=%d, %s\n", errCode, cudaGetErrorString(errCode));
-    }
+    cudaCheckError( cudaMalloc(&cudaRoulette, rouletteBytes) );
 
     curandState_t *states;
     int curandStateBytes = blocks * THREADS_PER_BLOCK * sizeof(curandState_t);
-    cudaMalloc(&states, curandStateBytes);
+    cudaCheckError( cudaMalloc(&states, curandStateBytes) );
     unsigned long long seed = CycleTimer::currentTicks();
     setupCurand<<<blocks, numThreads>>>(states, seed);
-    cudaThreadSynchronize();
-
-    errCode = cudaPeekAtLastError();
-    if (errCode != cudaSuccess) {
-        fprintf(stderr, "WARNING: A CUDA error occured: code=%d, %s\n", errCode, cudaGetErrorString(errCode));
-    }
+    cudaCheckError( cudaThreadSynchronize() );
 
     int *cudaResult;
-    cudaMalloc(&cudaResult, sizeof(int));
+    cudaCheckError( cudaMalloc(&cudaResult, sizeof(int)) );
 
     printf("Starting the genetic algorithm\n");
 
@@ -242,23 +248,18 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
 
     for (int i = 0; i < num_generations; i++) {
         gaKernel<<<blocks, THREADS_PER_BLOCK>>>(states, cudaPopulation, cudaBuffer, cudaRoulette, num_generations, debug);
-        cudaThreadSynchronize();
+        cudaCheckError( cudaThreadSynchronize() );
     }
     int totalFitness;
-    cudaMemcpy(&totalFitness, cudaResult, sizeof(int), cudaMemcpyDeviceToHost);
+    cudaCheckError( cudaMemcpy(&totalFitness, cudaResult, sizeof(int), cudaMemcpyDeviceToHost) );
 
     double endTime = CycleTimer::currentSeconds();
-
-    errCode = cudaPeekAtLastError();
-    if (errCode != cudaSuccess) {
-        fprintf(stderr, "WARNING: A CUDA error occured: code=%d, %s\n", errCode, cudaGetErrorString(errCode));
-    }
 
     double duration = endTime - startTime;
     printf("Overall time: %.4fs, fitness: %d\n", duration, totalFitness);
 
-    cudaFree(cudaResult);
-    cudaFree(states);
+    cudaCheckError( cudaFree(cudaResult) );
+    cudaCheckError( cudaFree(states) );
     cudaFreePopulation(cudaPopulation);
-    cudaFree(cudaBuffer);
+    cudaFreePopulation(cudaBuffer);
 }
