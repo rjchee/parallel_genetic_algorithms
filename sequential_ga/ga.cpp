@@ -169,7 +169,6 @@ static void generateOffsprings(population_t * population, population_t * buffer,
         crossover(population, buffer, i, parent1, parent2);
     }
 
-    free(roulette);
 }
 
 static void crossover(population_t * population, population_t * buffer, int index, int pc1, int pc2) {
