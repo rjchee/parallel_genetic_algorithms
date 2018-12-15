@@ -211,12 +211,9 @@ __global__ void gaKernel(curandState_t *states, population_t *population, popula
     curandState_t threadState = states[threadID];
     for (int i = 0; i < num_generations; i++) {
         generateOffsprings(threadID, &threadState, population, buffer, roulette);
-        __syncthreads();
-        if (threadID == 0) {
-            population_t *tmp = population;
-            population = buffer;
-            buffer = tmp;
-        }
+        population_t *tmp = population;
+        population = buffer;
+        buffer = tmp;
         __syncthreads();
         bool hasConverged = converged(threadID, population, debug);
         if (threadID == 0) {
