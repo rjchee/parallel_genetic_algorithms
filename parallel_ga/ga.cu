@@ -83,7 +83,7 @@ static void cudaFreePopulation(population_t *cudaPopulation) {
 }
 
 __device__ int evaluate(int threadID, population_t *population) {
-    int chromosomesPerThread = (population->numChromosomes + blockDim.x * THREADS_PER_BLOCK - 1) / (blockDim.x * THREADS_PER_BLOCK);
+    int chromosomesPerThread = (population->numChromosomes + THREADS_PER_BLOCK - 1) / (THREADS_PER_BLOCK);
     int startIdx = threadID  * chromosomesPerThread;
     int endIdx = startIdx + chromosomesPerThread;
     if (endIdx > population->numChromosomes) {
@@ -131,7 +131,7 @@ __device__ void generateOffsprings(int threadID, curandState_t *state, populatio
     }
     __syncthreads();
     // printf("generated roulette\n");
-    int iterationsPerThread = (population->numChromosomes / 2 + blockDim.x* THREADS_PER_BLOCK - 1) / (blockDim.x * THREADS_PER_BLOCK);
+    int iterationsPerThread = (population->numChromosomes / 2 + THREADS_PER_BLOCK - 1) / (THREADS_PER_BLOCK);
     int startIdx = threadID * iterationsPerThread;
     int endIdx = startIdx + iterationsPerThread;
     if (endIdx > population->numChromosomes / 2) {
@@ -202,7 +202,7 @@ __device__ int rouletteSelect(curandState_t *state, int *roulette, int size) {
 }
 
 __global__ void gaKernel(curandState_t *states, population_t *population, population_t *buffer, int *roulette, int *totalFitness, int num_generations, bool debug) {
-    int threadID = blockDim.x * blockIdx.x + threadIdx.x;
+    int threadID = threadIdx.x;
     curandState_t threadState = states[threadID];
     for (int i = 0; i < num_generations; i++) {
         generateOffsprings(threadID, &threadState, population, buffer, roulette);
@@ -228,14 +228,13 @@ __global__ void gaKernel(curandState_t *states, population_t *population, popula
 
 
 __global__ void setupCurand(curandState_t *state, unsigned long long seed_offset) {
-    int id = blockIdx.x * blockDim.x + threadIdx.x;
+    int id = threadIdx.x;
     curand_init(id + seed_offset, 0, 0, &state[id]);
 }
 
 
 void gaCuda(population_t *population, population_t *buffer, int num_generations, bool debug) {
     const int numThreads = THREADS_PER_BLOCK;
-    const int blocks = (population->numChromosomes + numThreads - 1) / numThreads;
 
     population_t *cudaPopulation = cudaInitPopulation(population);
     population_t *cudaBuffer = cudaInitPopulation(buffer);
@@ -247,10 +246,10 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
     cudaCheckError( cudaMalloc(&cudaRoulette, rouletteBytes) );
 
     curandState_t *states;
-    int curandStateBytes = blocks * THREADS_PER_BLOCK * sizeof(curandState_t);
+    int curandStateBytes = THREADS_PER_BLOCK * sizeof(curandState_t);
     cudaCheckError( cudaMalloc(&states, curandStateBytes) );
     unsigned long long seed = CycleTimer::currentTicks();
-    setupCurand<<<blocks, numThreads>>>(states, seed);
+    setupCurand<<<1, numThreads>>>(states, seed);
     cudaCheckError( cudaThreadSynchronize() );
 
     int *cudaResult;
@@ -259,7 +258,7 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
 
     double startTime = CycleTimer::currentSeconds();
 
-    gaKernel<<<blocks, THREADS_PER_BLOCK>>>(states, cudaPopulation, cudaBuffer, cudaRoulette, cudaResult, num_generations, debug);
+    gaKernel<<<1, THREADS_PER_BLOCK>>>(states, cudaPopulation, cudaBuffer, cudaRoulette, cudaResult, num_generations, debug);
     cudaCheckError( cudaThreadSynchronize() );
     int totalFitness;
     cudaCheckError( cudaMemcpy(&totalFitness, cudaResult, sizeof(int), cudaMemcpyDeviceToHost) );
