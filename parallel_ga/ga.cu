@@ -56,7 +56,6 @@ __device__ void printPopulation(population_t * population) {
         }
         printf("]\n");
     }
-    __syncthreads();
 }
 
 static population_t *cudaInitPopulation(population_t *hostPopulation) {
@@ -223,11 +222,11 @@ __global__ void gaKernel(curandState_t *states, population_t *population, popula
         if (threadID == 0) {
             *totalFitness = population->totalFitness;
         }
+        __syncthreads();
         if (hasConverged) {
             printf("converged\n");
             break;
         }
-        __syncthreads();
         if (debug && threadID == 0) {
             printPopulation(population);
         }
