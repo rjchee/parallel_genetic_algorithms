@@ -98,8 +98,8 @@ int main(int argc, char *argv[]) {
 }
 
 
-static population_t * initPopulation() {
-    population_t * population = (population_t *) malloc(sizeof(population_t));
+static population_t *initPopulation() {
+    population_t *population = (population_t *) malloc(sizeof(population_t));
     population->numChromosomes = population_size;
     population->genesPerChromosome = num_genes;
     population->mutationProb = mutation_prob;
@@ -109,9 +109,9 @@ static population_t * initPopulation() {
 
     chromosome_t *chromos = population->chromosomes;
     for (int i = 0; i < population->numChromosomes; i++) {
-        chromos[i].geneIdx = i * num_genes;
+        chromos[i].geneIdx = i * population->genesPerChromosome;
         gene_t *genes = &population->genes[chromos[i].geneIdx];
-        for (int j = 0; j < totalNumGenes; j++) {
+        for (int j = 0; j < population->genesPerChromosome; j++) {
             genes[j].val = rand() % 2;
         }
         chromos[i].fitness = 0;
