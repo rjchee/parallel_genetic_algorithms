@@ -10,7 +10,7 @@ static void cleanupPopulation(population_t *population);
 
 void gaCuda(population_t *population, population_t *buffer, int num_generations, bool debug);
 
-static bool debug = true;
+static bool debug = false;
 static size_t population_size = 10000;
 static size_t num_genes = 100;
 static float mutation_prob = 0.05;
