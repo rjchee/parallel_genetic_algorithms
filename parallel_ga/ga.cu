@@ -86,6 +86,9 @@ __device__ int evaluate(int threadID, population_t *population) {
     int chromosomesPerThread = (population->numChromosomes + blockDim.x * THREADS_PER_BLOCK - 1) / (blockDim.x * THREADS_PER_BLOCK);
     int startIdx = threadID  * chromosomesPerThread;
     int endIdx = startIdx + chromosomesPerThread;
+    if (endIdx > population->numChromosomes) {
+        endIdx = population->numChromosomes;
+    }
 
     for (int i = startIdx; i < endIdx; i++) {
         evaluateFitness(threadID, population, i);
@@ -128,6 +131,9 @@ __device__ void generateOffsprings(int threadID, curandState_t *state, populatio
     int iterationsPerThread = (population->numChromosomes / 2 + blockDim.x* THREADS_PER_BLOCK - 1) / (blockDim.x * THREADS_PER_BLOCK);
     int startIdx = threadID * iterationsPerThread;
     int endIdx = startIdx + iterationsPerThread;
+    if (endIdx > population->numChromosomes / 2) {
+        endIdx = population->numChromosomes / 2;
+    }
     for (int i = startIdx; i < endIdx; i++) {
         int parent1 = rouletteSelect(state, roulette, population->numChromosomes);
         int parent2 = rouletteSelect(state, roulette, population->numChromosomes);
