@@ -24,6 +24,7 @@ __device__ void crossover(curandState_t *state, population_t *population, popula
 __device__ void generateRoulette(int threadID, population_t * population, int *roulette);
 __device__ int rouletteSelect(curandState_t *state, int * roulette, int n);
 __global__ void gaKernel(curandState_t *states, population_t population, population_t buffer, int *roulette);
+__global__ void setupCurand(curandState *state, unsigned long long seed_offset);
 
 static void cudaInitPopulation(population_t *hostPopulation, population_t *cudaPopulation) {
     size_t chromosomeBytes = hostPopulation->numChromosomes * sizeof(chromosome_t);
@@ -156,7 +157,7 @@ __global__ void gaKernel(curandState_t *states, population_t population, populat
     curandState_t threadState = states[threadID];
     for (int generation = 0; generation < NUM_GENERATIONS; generation++) {
         generateOffsprings(threadID, &threadState, &population, &buffer, roulette);
-        if (converged(threadID, population)) {
+        if (converged(threadID, &population)) {
             break;
         }
         __syncthreads();
@@ -171,7 +172,7 @@ __global__ void setupCurand(curandState *state, unsigned long long seed_offset) 
 
 
 void gaCuda(population_t *population, population_t *buffer) {
-    const int blocks = (population->numChromosomes + NUM_THREADS - 1) / NUM_THREADS;
+    const int blocks = (population->numChromosomes + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
     population_t cudaPopulation;
     population_t cudaBuffer;
