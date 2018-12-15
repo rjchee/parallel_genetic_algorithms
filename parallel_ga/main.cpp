@@ -28,7 +28,7 @@ void usage(const char* progname) {
     printf("  -?  --help                   This message\n");
 }
 
-int main(int argc, const char *argv[]) {
+int main(int argc, char *argv[]) {
     int opt;
     static struct option long_options[] = {
         {"populationsize", 1, NULL, 'p'},
@@ -84,8 +84,7 @@ int main(int argc, const char *argv[]) {
     }
 
     srand(CycleTimer::currentTicks());
-    double minTime = 1e30;
-    for (int trial = 0; trial < NUM_TRIALS; trial++) {
+    for (int trial = 0; trial < num_trials; trial++) {
         population_t *population = initPopulation();
         population_t *buffer = initPopulation();
 
@@ -106,10 +105,10 @@ static population_t * initPopulation() {
     population->genes = (gene_t *) malloc(sizeof(gene_t) * population->numChromosomes * population->genesPerChromosome);
 
     chromosome_t *chromos = population->chromosomes;
-    for (int i = 0; i < population_size; i++) {
+    for (int i = 0; i < population->numChromosomes; i++) {
         chromos[i].geneIdx = i * num_genes;
         gene_t *genes = &population->genes[chromos[i].geneIdx];
-        for (int j = 0; j < num_genes; j++) {
+        for (int j = 0; j < population->numGenes; j++) {
             genes[j].val = rand() % 2;
         }
         chromos[i].fitness = 0;
