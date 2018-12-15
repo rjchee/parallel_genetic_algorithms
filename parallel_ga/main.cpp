@@ -10,7 +10,7 @@ static void cleanupPopulation(population_t *population);
 
 void gaCuda(population_t *population, population_t *buffer, int num_generations, bool debug);
 
-static bool debug = false;
+static bool debug = true;
 static size_t population_size = 10000;
 static size_t num_genes = 100;
 static float mutation_prob = 0.05;
@@ -25,6 +25,7 @@ void usage(const char* progname) {
     printf("  -m  --mutationprob <DOUBLE>  Probability for a gene to mutate\n");
     printf("  -t  --numtrials <INT>        Number of times to run the genetic algorithm\n");
     printf("  -n  --numgenerations <INT>   Max number of generations to grow\n");
+    printf("  -d                           Turn on debug prints\n");
     printf("  -?  --help                   This message\n");
 }
 

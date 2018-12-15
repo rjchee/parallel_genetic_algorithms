@@ -33,6 +33,7 @@ void usage(const char* progname) {
     printf("  -m  --mutationprob <DOUBLE>  Probability for a gene to mutate\n");
     printf("  -t  --numtrials <INT>        Number of times to run the genetic algorithm\n");
     printf("  -n  --numgenerations <INT>   Max number of generations to grow\n");
+    printf("  -d                           Turn on debug prints\n");
     printf("  -?  --help                   This message\n");
 }
 
