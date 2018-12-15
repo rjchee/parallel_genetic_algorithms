@@ -18,7 +18,7 @@
 static void cudaInitPopulation(population_t *hostPopulation, population_t);
 __device__ bool converged(population_t *population);
 __device__ int evaluate(population_t *population);
-static int evaluateFitness(chromosome_t *chromo);
+__device__ int evaluateFitness(int threadID, population_t *population, int chromoIdx);
 __device__ void generateOffsprings(int threadID, curandState_t *state, population_t * population, population_t * buffer, int *roulette);
 __device__ void crossover(curandState_t *state, population_t *population, population_t *buffer, int index, int p1, int p2);
 __device__ void generateRoulette(int threadID, population_t * population, int *roulette);
