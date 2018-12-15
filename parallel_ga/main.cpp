@@ -39,7 +39,6 @@ static population_t * initPopulation() {
 
     chromosome_t *chromos = population->chromosomes;
     for (int i = 0; i < POPULATION_SIZE; i++) {
-        chromos[i].numOfGenes = NUM_GENES;
         chromos[i].geneIdx = i * NUM_GENES;
         gene_t *genes = &population->genes[chromos[i].geneIdx];
         for (int j = 0; j < NUM_GENES; j++) {
