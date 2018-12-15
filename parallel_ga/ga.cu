@@ -26,7 +26,7 @@ __global__ void gaKernel(curandState_t *states, population_t *population, popula
 __global__ void setupCurand(curandState_t *state, unsigned long long seed_offset);
 
 
-__global__ void printPopulation(population_t * population) {
+__device__ void printPopulation(population_t * population) {
     chromosome_t *chromos = population->chromosomes;
     gene_t *genes = population->genes;
     int numChromosomes = population->numChromosomes;
