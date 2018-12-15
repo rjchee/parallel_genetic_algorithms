@@ -18,11 +18,11 @@ static population_t * initPopulation();
 static void printPopulation(population_t * population);
 static bool converged(population_t *population);
 static int evaluate(population_t * population);
-static int evaluateFitness(chromosome_t *chromo);
-static void generateOffsprings(population_t * population, population_t * buffer);
+static int evaluateFitness(population_t *population, int chromoIdx);
+static void generateOffsprings(population_t * population, population_t * buffer, int *roulette);
 static void crossover(population_t * population, population_t * buffer, int index, int p1, int p2);
-static int *generateRoulette(population_t * population);
-static int rouletteSelect(int * roulette, int n);
+static void generateRoulette(population_t * population, int *roulette);
+static int rouletteSelect(int * roulette, int size);
 static void cleanupPopulation(population_t *population);
 
 void usage(const char* progname) {
@@ -100,12 +100,13 @@ int main(int argc, char *argv[]) {
         printPopulation(population);
         population_t * buffer = initPopulation();
         evaluate(population);
+        int *roulette = (int *)malloc((population->numChromosomes + 1) *sizeof(int));
 
         double startTime = CycleTimer::currentSeconds();
         int generation;
         for (generation = 0; generation != num_generations; generation++) {
             printPopulation(population);
-            generateOffsprings(population, buffer);
+            generateOffsprings(population, buffer, roulette);
             population_t *tmp = population;
             population = buffer;
             buffer = tmp;
@@ -125,6 +126,7 @@ int main(int argc, char *argv[]) {
         printf("trial %d: %.4f seconds, fitness: %d\n", i, totalTime, fitness);
         minTime = std::min(minTime, totalTime);
 
+        free(roulette);
         cleanupPopulation(population);
         cleanupPopulation(buffer);
     }
@@ -136,8 +138,8 @@ int main(int argc, char *argv[]) {
 
 static int evaluate(population_t * population) {
     int sum = 0;
-    for (int i = 0; i < population->size; i++) {
-        sum += evaluateFitness(&(population->chromosomes[i]));
+    for (int i = 0; i < population->numChromosomes; i++) {
+        sum += evaluateFitness(population, i);
     }
     return sum;
 }
@@ -146,21 +148,23 @@ static bool converged(population_t *population) {
     return evaluate(population) == (int)(population_size * num_genes);
 }
 
-static int evaluateFitness(chromosome_t *chromo) {
+static int evaluateFitness(population_t *population, int chromoIdx) {
     int val = 0;
-    for (int i = 0; i < chromo->numOfGenes; i++) {
-        val += chromo->genes[i].val;
+    int startIdx = population->chromosomes[chromoIdx].geneIdx;
+    int endIdx = startIdx + population->genesPerChromosome;
+    for (int i = startIdx; i < endIdx; i++) {
+        val += population->genes[i].val;
     }
-    chromo->fitness = val;
+    population->chromosomes[chromoIdx].fitness = val;
     return val;
 }
 
-static void generateOffsprings(population_t * population, population_t * buffer) {
-    int * roulette = generateRoulette(population);
+static void generateOffsprings(population_t * population, population_t * buffer, int *roulette) {
+    generateRoulette(population, roulette);
     // printf("generated roulette\n");
-    for (int i = 0; i < population->size; i += 2) {
-        int parent1 = rouletteSelect(roulette, population->size + 1);
-        int parent2 = rouletteSelect(roulette, population->size + 1);
+    for (int i = 0; i < population->numChromosomes; i += 2) {
+        int parent1 = rouletteSelect(roulette, population->numChromosomes);
+        int parent2 = rouletteSelect(roulette, population->numChromosomes);
         // printf("crossover %d & %d to generate %d & %d\n", parent1, parent2, i, i + 1);
         crossover(population, buffer, i, parent1, parent2);
     }
@@ -168,49 +172,50 @@ static void generateOffsprings(population_t * population, population_t * buffer)
     free(roulette);
 }
 
-static void crossover(population_t * population, population_t * buffer, int index, int p1, int p2) {
-    chromosome_t * parent1 = &(population->chromosomes[p1]);
-    chromosome_t * parent2 = &(population->chromosomes[p2]);
-    chromosome_t * child1 = &(population->chromosomes[index]);
-    chromosome_t * child2 = &(population->chromosomes[index + 1]);
+static void crossover(population_t * population, population_t * buffer, int index, int pc1, int pc2) {
+    chromosome_t * parent1 = &population->chromosomes[pc1];
+    chromosome_t * parent2 = &population->chromosomes[pc2];
+    chromosome_t * child1 = &buffer->chromosomes[index];
+    chromosome_t * child2 = &buffer->chromosomes[index + 1];
 
-    int val = rand() / parent1->numOfGenes;
-    for (int i = 0; i < parent1->numOfGenes; i++) {
-        if (i < val) {
-            child1->genes[i].val = parent1->genes[i].val;
-            child2->genes[i].val = parent2->genes[i].val;
+    int crossoverIdx = rand() % population->genesPerChromosome;
+    int c1 = child1->geneIdx;
+    int c2 = child2->geneIdx;
+    int p1 = parent1->geneIdx;
+    int p2 = parent2->geneIdx;
+    for (int i = 0; i < population->genesPerChromosome; i++, c1++, c2++, p1++, p2++) {
+        if (i < crossoverIdx) {
+            buffer->genes[c1].val = population->genes[p1].val;
+            buffer->genes[c2].val = population->genes[p2].val;
         } else {
-            child1->genes[i].val = parent2->genes[i].val;
-            child2->genes[i].val = parent1->genes[i].val;
+            buffer->genes[c1].val = population->genes[p2].val;
+            buffer->genes[c2].val = population->genes[p1].val;
         }
 
         double r = (double) rand() / ((double) RAND_MAX + 1.0);
         if (r < population->mutationProb) {
-            child1->genes[i].val ^= 1;
+            buffer->genes[c1].val ^= 1;
         }
 
         r = (double) rand() / ((double) RAND_MAX + 1.0);
         if (r < population->mutationProb) {
-            child2->genes[i].val ^= 1;
+            buffer->genes[c2].val ^= 1;
         }
     }
 }
 
-static int *generateRoulette(population_t * population) {
-    int * roulette = (int *) malloc(sizeof(int) * (population->size + 1));
-
+static void generateRoulette(population_t * population, int *roulette) {
     roulette[0] = 0;
-    for (int i = 1; i <= population->size; i++) {
+    for (int i = 1; i <= population->numChromosomes; i++) {
         roulette[i] = roulette[i - 1] + population->chromosomes[i - 1].fitness;
         // printf("roulette: %d: %d, %d\n", i, roulette[i], (population->chromosomes)[i - 1].fitness);
     }
-    return roulette;
 }
 
-static int rouletteSelect(int * roulette, int n) {
-    int val = rand() % roulette[n - 1];
+static int rouletteSelect(int * roulette, int size) {
+    int val = rand() % roulette[size];
 
-    for (int i = 0; i < n - 1; i++) {
+    for (int i = 0; i < size; i++) {
         if (val < roulette[i + 1]) {
             return i;
         }
@@ -220,18 +225,21 @@ static int rouletteSelect(int * roulette, int n) {
 }
 
 
-static population_t * initPopulation() {
-    population_t * population = (population_t *) malloc(sizeof(population_t));
-    population->size = population_size;
+static population_t *initPopulation() {
+    population_t *population = (population_t *) malloc(sizeof(population_t));
+    population->numChromosomes = population_size;
+    population->genesPerChromosome = num_genes;
     population->mutationProb = mutation_prob;
-    population->chromosomes = (chromosome_t *) malloc(sizeof(chromosome_t) * population_size);
+    population->chromosomes = (chromosome_t *) malloc(sizeof(chromosome_t) * population->numChromosomes);
+    int totalNumGenes = population->numChromosomes * population->genesPerChromosome;
+    population->genes = (gene_t *) malloc(sizeof(gene_t) * totalNumGenes);
 
     chromosome_t *chromos = population->chromosomes;
-    for (size_t i = 0; i < population_size; i++) {
-        chromos[i].numOfGenes = num_genes;
-        chromos[i].genes = (gene_t *) malloc(sizeof(gene_t) * num_genes);
-        for (size_t j = 0; j < num_genes; j++) {
-            chromos[i].genes[j].val = rand() % 2;
+    for (int i = 0; i < population->numChromosomes; i++) {
+        chromos[i].geneIdx = i * population->genesPerChromosome;
+        gene_t *genes = &population->genes[chromos[i].geneIdx];
+        for (int j = 0; j < population->genesPerChromosome; j++) {
+            genes[j].val = rand() % 2;
         }
         chromos[i].fitness = 0;
     }
@@ -240,9 +248,7 @@ static population_t * initPopulation() {
 
 
 static void cleanupPopulation(population_t *population) {
-    for (size_t i = 0; i < population_size; i++) {
-        free(population->chromosomes[i].genes);
-    }
+    free(population->genes);
     free(population->chromosomes);
     free(population);
 }
@@ -251,12 +257,17 @@ static void cleanupPopulation(population_t *population) {
 static void printPopulation(population_t * population) {
     if (debug) {
         chromosome_t *chromos = population->chromosomes;
-        for (size_t i = 0; i < population_size; i++) {
-            printf("chromosome %lu: [", i);
-            for (size_t j = 0; j < num_genes; j++) {
-                printf("%d, ", chromos[i].genes[j].val);
+        gene_t *genes = population->genes;
+        size_t numChromosomes = population->numChromosomes;
+        size_t genesPerChromosome = population->genesPerChromosome;
+        for (size_t i = 0; i < numChromosomes; i++) {
+            size_t startGene = chromos[i].geneIdx;
+            size_t endGene = startGene + genesPerChromosome;
+            printf("chromosome %lu: fitness: %d [", i, chromos[i].fitness);
+            for (size_t j = startGene; j < endGene; j++) {
+                printf("%d, ", genes[j].val);
             }
-            printf("] fitness: %d\n", chromos[i].fitness);
+            printf("]\n");
         }
     }
 }

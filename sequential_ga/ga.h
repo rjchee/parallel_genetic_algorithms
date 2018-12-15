@@ -2,20 +2,20 @@
 #define __GA_H__
 
 typedef struct {
-	char val;
+    char val;
 } gene_t;
 
 typedef struct {
-	int numOfGenes;
-	int fitness;
-	gene_t * genes;
+    int fitness;
+    int geneIdx;
 } chromosome_t;
 
 typedef struct {
-	double mutationProb;
-	int size;
-	chromosome_t * chromosomes;
+    double mutationProb;
+    int numChromosomes;
+    int genesPerChromosome;
+    chromosome_t *chromosomes;
+    gene_t *genes;
 } population_t;
-
 
 #endif
