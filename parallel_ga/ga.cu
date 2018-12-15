@@ -29,7 +29,7 @@ __global__ void setupCurand(curandState_t *state, unsigned long long seed_offset
 static void cudaInitPopulation(population_t *hostPopulation, population_t *cudaPopulation) {
     size_t chromosomeBytes = hostPopulation->numChromosomes * sizeof(chromosome_t);
     cudaMalloc(&cudaPopulation->chromosomes, chromosomeBytes);
-    size_t geneBytes = hostPopulation->numGenes * sizeof(gene_t);
+    size_t geneBytes = hostPopulation->numChromosomes * hostPopulation->genesPerChromosome * sizeof(gene_t);
     cudaMalloc(&cudaPopulation->genes, geneBytes);
     cudaMemcpy(cudaPopulation->chromosomes, hostPopulation->chromosomes, chromosomeBytes, cudaMemcpyHostToDevice);
     cudaMemcpy(cudaPopulation->genes, hostPopulation->genes, geneBytes, cudaMemcpyHostToDevice);
@@ -55,7 +55,7 @@ __device__ int evaluate(int threadID, population_t *population) {
 __device__ bool converged(int threadID, population_t *population) {
     int totalFitness = evaluate(threadID, population);
     population->totalFitness = totalFitness;
-    return totalFitness == population->numChromosomes * population->numGenes;
+    return totalFitness == population->numChromosomes * population->genesPerChromosome;
 }
 
 

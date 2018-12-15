@@ -32,10 +32,10 @@ int main(int argc, const char *argv[]) {
 static population_t * initPopulation() {
     population_t * population = (population_t *) malloc(sizeof(population_t));
     population->numChromosomes = POPULATION_SIZE;
-    population->numGenes = POPULATION_SIZE * NUM_GENES;
+    population->genesPerChromosome = NUM_GENES;
     population->mutationProb = MUTATION_PROB;
     population->chromosomes = (chromosome_t *) malloc(sizeof(chromosome_t) * population->numChromosomes);
-    population->genes = (gene_t *) malloc(sizeof(gene_t) * population->numGenes);
+    population->genes = (gene_t *) malloc(sizeof(gene_t) * population->numChromosomes * population->genesPerChromosome);
 
     chromosome_t *chromos = population->chromosomes;
     for (int i = 0; i < POPULATION_SIZE; i++) {
