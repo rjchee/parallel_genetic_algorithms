@@ -31,7 +31,7 @@ inline void cudaAssert(cudaError_t code, const char *file, int line, bool abort=
 
 __device__ void printPopulation(population_t *population);
 static population_t *cudaInitPopulation(population_t *hostPopulation);
-__device__ bool converged(int threadID, population_t *population);
+__device__ bool converged(int threadID, population_t *population, bool debug);
 __device__ int evaluate(population_t *population);
 __device__ int evaluateFitness(int threadID, population_t *population, int chromoIdx);
 __device__ void generateOffsprings(int threadID, curandState_t *state, population_t * population, population_t * buffer, int *roulette);
@@ -105,8 +105,11 @@ __device__ int evaluate(int threadID, population_t *population) {
 }
 
 
-__device__ bool converged(int threadID, population_t *population) {
+__device__ bool converged(int threadID, population_t *population, bool debug) {
     int totalFitness = evaluate(threadID, population);
+    if (debug) {
+        printf("thread %d: fitness = %d\n", threadID, totalFitness);
+    }
     population->totalFitness = totalFitness;
     return totalFitness == population->numChromosomes * population->genesPerChromosome;
 }
@@ -213,8 +216,10 @@ __global__ void gaKernel(curandState_t *states, population_t *population, popula
             buffer = tmp;
         }
         __syncthreads();
-        bool hasConverged = converged(threadID, population);
-        *totalFitness = population->totalFitness;
+        bool hasConverged = converged(threadID, population, debug);
+        if (threadID == 0) {
+            *totalFitness = population->totalFitness;
+        }
         if (hasConverged) {
             printf("converged\n");
             break;
