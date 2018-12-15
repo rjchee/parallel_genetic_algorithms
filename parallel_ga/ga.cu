@@ -97,29 +97,34 @@ __device__ void generateOffsprings(int threadID, curandState_t *state, populatio
 
 
 __device__ void crossover(curandState_t *state, population_t *population, population_t *buffer, int index, int p1, int p2) {
-    chromosome_t *parent1 = &(population->chromosomes[p1]);
-    chromosome_t *parent2 = &(population->chromosomes[p2]);
-    chromosome_t *child1 = &(buffer->chromosomes[index]);
-    chromosome_t *child2 = &(buffer->chromosomes[index + 1]);
+    chromosome_t *parent1 = &population->chromosomes[p1];
+    chromosome_t *parent2 = &population->chromosomes[p2];
+    chromosome_t *child1 = &buffer->chromosomes[index];
+    chromosome_t *child2 = &buffer->chromosomes[index + 1];
 
-    int val = (int)(curand_uniform(state) * parent1->numOfGenes);
-    for (int i = 0; i < parent1->numOfGenes; i++) {
-        if (i < val) {
-            child1->genes[i].val = parent1->genes[i].val;
-            child2->genes[i].val = parent2->genes[i].val;
+    int genesPerChromosome = parent1->numOfGenes;
+    int crossoverIdx = (int)(curand_uniform(state) * genesPerChromosome);
+    int c1 = child1->geneIdx;
+    int c2 = child2->geneIdx;
+    int p1 = parent1->geneIdx;
+    int p2 = parent2->geneIdx;
+    for (int i = 0; i < genesPerChromosome; i++, c1++, c2++, p1++, p2++) {
+        if (i < crossoverIdx) {
+            buffer->genes[c1].val = population->genes[p1].val;
+            buffer->genes[c2].val = population->genes[p2].val;
         } else {
-            child1->genes[i].val = parent2->genes[i].val;
-            child2->genes[i].val = parent1->genes[i].val;
+            buffer->genes[c1].val = population->genes[p2].val;
+            buffer->genes[c2].val = population->genes[p1].val;
         }
 
         double r = (double) curand_uniform(state);
         if (r < population->mutationProb) {
-            child1->genes[i].val ^= 1;
+            buffer->genes[c1].val ^= 1;
         }
 
         r = (double) curand_uniform(state);
         if (r < population->mutationProb) {
-            child2->genes[i].val ^= 1;
+            buffer->genes[c2].val ^= 1;
         }
     }
 }
