@@ -16,8 +16,8 @@ void gaCuda(population_t *population, population_t *buffer);
 
 
 int main(int argc, const char *argv[]) {
-    srand(CycleTimer::numTicks());
-    for (int trial = 0; trial < NUM_TRIALS; i++) {
+    srand(CycleTimer::currentTicks());
+    for (int trial = 0; trial < NUM_TRIALS; trial++) {
         population_t *population = initPopulation();
         population_t *buffer = initPopulation();
 
