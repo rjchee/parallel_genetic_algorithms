@@ -42,9 +42,10 @@ __device__ int evaluate(int threadID, population_t *population) {
     for (int i = startIdx; i < endIdx; i++) {
         evaluateFitness(threadID, population, i);
     }
+    __syncthreads();
     int sum = 0;
     for (int i = 0; i < population->numChromosomes; i++) {
-        sum += evaluateFitness(threadID, &population->chromosomes[i]);
+        sum += population->chromosomes[i].fitness;
     }
     return sum;
 }
