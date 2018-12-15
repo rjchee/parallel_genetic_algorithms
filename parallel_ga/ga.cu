@@ -60,6 +60,7 @@ __device__ void printPopulation(population_t * population) {
 }
 
 static population_t *cudaInitPopulation(population_t *hostPopulation) {
+    printf("Initializing population on CUDA\n");
     population_t tmpPopulation = *hostPopulation;
     size_t chromosomeBytes = hostPopulation->numChromosomes * sizeof(chromosome_t);
     cudaCheckError( cudaMalloc(&tmpPopulation.chromosomes, chromosomeBytes) );
