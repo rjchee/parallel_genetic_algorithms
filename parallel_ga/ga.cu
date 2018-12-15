@@ -47,13 +47,21 @@ static population_t *cudaInitPopulation(population_t *hostPopulation) {
     cudaMalloc(&cudaPopulation, sizeof(population_t));
     population_t tmpPopulation = *hostPopulation;
     size_t chromosomeBytes = hostPopulation->numChromosomes * sizeof(chromosome_t);
-    cudaMalloc(&tmpPopulation->chromosomes, chromosomeBytes);
+    cudaMalloc(&tmpPopulation.chromosomes, chromosomeBytes);
     size_t geneBytes = hostPopulation->numChromosomes * hostPopulation->genesPerChromosome * sizeof(gene_t);
-    cudaMalloc(&tmpPopulation->genes, geneBytes);
+    cudaMalloc(&tmpPopulation.genes, geneBytes);
     cudaMemcpy(tmpPopulation.chromosomes, hostPopulation->chromosomes, chromosomeBytes, cudaMemcpyHostToDevice);
     cudaMemcpy(tmpPopulation.genes, hostPopulation->genes, geneBytes, cudaMemcpyHostToDevice);
     cudaMemcpy(cudaPopulation, &tmpPopulation, sizeof(population_t), cudaMemcpyHostToDevice);
     return cudaPopulation;
+}
+
+static void cudaFreePopulation(population_t *cudaPopulation) {
+    population_t hostPopulation;
+    cudaMemcpy(&hostPopulation, cudaPopulation, sizeof(population_t), cudaMemcpyDeviceToHost);
+    cudaFree(hostPopulation.chromosomes);
+    cudaFree(hostPopulation.genes);
+    cudaFree(cudaPopulation);
 }
 
 __device__ int evaluate(int threadID, population_t *population) {
@@ -223,7 +231,7 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
     gaKernel<<<blocks, THREADS_PER_BLOCK>>>(states, cudaPopulation, cudaBuffer, cudaRoulette, num_generations, debug);
     cudaThreadSynchronize();
     int totalFitness;
-    cudaMemcpy(cudaResult, &totalFitness, sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&totalFitness, cudaResult, sizeof(int), cudaMemcpyDeviceToHost);
 
     double endTime = CycleTimer::currentSeconds();
 
@@ -244,6 +252,6 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
 
     cudaFree(cudaResult);
     cudaFree(states);
-    cudaFree(cudaPopulation.chromosomes);
-    cudaFree(cudaPopulation.genes);
+    cudaFreePopulation(cudaPopulation);
+    cudaFree(cudaBuffer);
 }
