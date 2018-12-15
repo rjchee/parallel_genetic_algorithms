@@ -187,7 +187,7 @@ void gaCuda(population_t *population, population_t *buffer) {
     cudaMalloc(&cudaRoulette, rouletteBytes);
 
     curandState_t *states;
-    int curandStateBytes = blockDim.x * THREADS_PER_BLOCK * sizeof(curandState_t);
+    int curandStateBytes = blocks * THREADS_PER_BLOCK * sizeof(curandState_t);
     cudaMalloc(&states, curandStateBytes);
     unsigned long long seed = CycleTimer::currentTicks();
     setupCurand<<<blocks, numThreads>>>(states, seed);
