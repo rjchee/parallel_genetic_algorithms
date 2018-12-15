@@ -195,23 +195,25 @@ __device__ int rouletteSelect(curandState_t *state, int *roulette, int size) {
 __global__ void gaKernel(curandState_t *states, population_t *population, population_t *buffer, int *roulette, int *totalFitness, int num_generations, bool debug) {
     int threadID = blockDim.x * blockIdx.x + threadIdx.x;
     curandState_t threadState = states[threadID];
-    generateOffsprings(threadID, &threadState, population, buffer, roulette);
-    __syncthreads();
-    if (threadID == 0) {
-        population_t *tmp = population;
-        population = buffer;
-        buffer = tmp;
-    }
-    __syncthreads();
-    bool hasConverged = converged(threadID, population);
-    *totalFitness = population->totalFitness;
-    if (hasConverged) {
-        printf("converged\n");
-        return;
-    }
-    __syncthreads();
-    if (debug && threadID == 0) {
-        printPopulation(population);
+    for (int i = 0; i < num_generations; i++) {
+        generateOffsprings(threadID, &threadState, population, buffer, roulette);
+        __syncthreads();
+        if (threadID == 0) {
+            population_t *tmp = population;
+            population = buffer;
+            buffer = tmp;
+        }
+        __syncthreads();
+        bool hasConverged = converged(threadID, population);
+        *totalFitness = population->totalFitness;
+        if (hasConverged) {
+            printf("converged\n");
+            return;
+        }
+        __syncthreads();
+        if (debug && threadID == 0) {
+            printPopulation(population);
+        }
     }
 }
 
@@ -248,10 +250,8 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
 
     double startTime = CycleTimer::currentSeconds();
 
-    for (int i = 0; i < num_generations; i++) {
-        gaKernel<<<blocks, THREADS_PER_BLOCK>>>(states, cudaPopulation, cudaBuffer, cudaRoulette, cudaResult, num_generations, debug);
-        cudaCheckError( cudaThreadSynchronize() );
-    }
+    gaKernel<<<blocks, THREADS_PER_BLOCK>>>(states, cudaPopulation, cudaBuffer, cudaRoulette, cudaResult, num_generations, debug);
+    cudaCheckError( cudaThreadSynchronize() );
     int totalFitness;
     cudaCheckError( cudaMemcpy(&totalFitness, cudaResult, sizeof(int), cudaMemcpyDeviceToHost) );
 
