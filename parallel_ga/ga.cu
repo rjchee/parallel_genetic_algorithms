@@ -60,16 +60,23 @@ __device__ void printPopulation(population_t * population) {
 }
 
 static population_t *cudaInitPopulation(population_t *hostPopulation) {
-    population_t *cudaPopulation;
-    cudaCheckError( cudaMalloc(&cudaPopulation, sizeof(population_t)) );
     population_t tmpPopulation = *hostPopulation;
     size_t chromosomeBytes = hostPopulation->numChromosomes * sizeof(chromosome_t);
     cudaCheckError( cudaMalloc(&tmpPopulation.chromosomes, chromosomeBytes) );
+    printf("Malloc'd cuda chromosomes\n");
     size_t geneBytes = hostPopulation->numChromosomes * hostPopulation->genesPerChromosome * sizeof(gene_t);
     cudaCheckError( cudaMalloc(&tmpPopulation.genes, geneBytes) );
+    printf("Malloc'd cuda genes\n");
     cudaCheckError( cudaMemcpy(tmpPopulation.chromosomes, hostPopulation->chromosomes, chromosomeBytes, cudaMemcpyHostToDevice) );
+    printf("copied cuda chromosomes\n");
     cudaCheckError( cudaMemcpy(tmpPopulation.genes, hostPopulation->genes, geneBytes, cudaMemcpyHostToDevice) );
+    printf("copied cuda genes\n");
+
+    population_t *cudaPopulation;
+    cudaCheckError( cudaMalloc(&cudaPopulation, sizeof(population_t)) );
+    printf("Malloc'd cuda population\n");
     cudaCheckError( cudaMemcpy(cudaPopulation, &tmpPopulation, sizeof(population_t), cudaMemcpyHostToDevice) );
+    printf("copied population struct\n");
     return cudaPopulation;
 }
 
