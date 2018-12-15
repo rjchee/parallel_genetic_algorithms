@@ -191,7 +191,7 @@ __global__ void gaKernel(curandState_t *states, population_t *population, popula
         }
         __syncthreads();
         if (debug && threadID == 0) {
-            printPopulation(population);
+            printPopulation<<<1, 1>>>(population);
         }
     }
 }
