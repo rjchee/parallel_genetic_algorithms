@@ -16,7 +16,7 @@
 // TODO: store copies of heavily accessed shared memory to local memory
 
 static void cudaInitPopulation(population_t *hostPopulation, population_t);
-__device__ bool converged(population_t *population);
+__device__ bool converged(int threadID, population_t *population);
 __device__ int evaluate(population_t *population);
 __device__ int evaluateFitness(int threadID, population_t *population, int chromoIdx);
 __device__ void generateOffsprings(int threadID, curandState_t *state, population_t * population, population_t * buffer, int *roulette);
