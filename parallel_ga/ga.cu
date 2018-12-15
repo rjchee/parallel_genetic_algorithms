@@ -38,7 +38,7 @@ __device__ void generateOffsprings(int threadID, curandState_t *state, populatio
 __device__ void crossover(curandState_t *state, population_t *population, population_t *buffer, int index, int pc1, int pc2);
 __device__ void generateRoulette(int threadID, population_t * population, int *roulette);
 __device__ int rouletteSelect(curandState_t *state, int * roulette, int n);
-__global__ void gaKernel(curandState_t *states, population_t *population, population_t *buffer, int *roulette, int num_generations, bool debug);
+__global__ void gaKernel(curandState_t *states, population_t *population, population_t *buffer, int *roulette, int *totalFitness, int num_generations, bool debug);
 __global__ void setupCurand(curandState_t *state, unsigned long long seed_offset);
 
 
@@ -192,7 +192,7 @@ __device__ int rouletteSelect(curandState_t *state, int *roulette, int size) {
     return -1;
 }
 
-__global__ void gaKernel(curandState_t *states, population_t *population, population_t *buffer, int *roulette, int num_generations, bool debug) {
+__global__ void gaKernel(curandState_t *states, population_t *population, population_t *buffer, int *roulette, int *totalFitness, int num_generations, bool debug) {
     int threadID = blockDim.x * blockIdx.x + threadIdx.x;
     curandState_t threadState = states[threadID];
     generateOffsprings(threadID, &threadState, population, buffer, roulette);
@@ -203,7 +203,9 @@ __global__ void gaKernel(curandState_t *states, population_t *population, popula
         buffer = tmp;
     }
     __syncthreads();
-    if (converged(threadID, population)) {
+    bool hasConverged = converged(threadID, population);
+    *totalFitness = population->totalFitness;
+    if (hasConverged) {
         printf("converged\n");
         return;
     }
@@ -247,7 +249,7 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
     double startTime = CycleTimer::currentSeconds();
 
     for (int i = 0; i < num_generations; i++) {
-        gaKernel<<<blocks, THREADS_PER_BLOCK>>>(states, cudaPopulation, cudaBuffer, cudaRoulette, num_generations, debug);
+        gaKernel<<<blocks, THREADS_PER_BLOCK>>>(states, cudaPopulation, cudaBuffer, cudaRoulette, cudaResult, num_generations, debug);
         cudaCheckError( cudaThreadSynchronize() );
     }
     int totalFitness;
