@@ -22,7 +22,7 @@ __device__ int evaluateFitness(int threadID, population_t *population, int chrom
 __device__ void generateOffsprings(int threadID, curandState_t *state, population_t * population, population_t * buffer, int *roulette);
 __device__ void crossover(curandState_t *state, population_t *population, population_t *buffer, int index, int p1, int p2);
 __device__ void generateRoulette(int threadID, population_t * population, int *roulette);
-__device__ int rouletteSelect(int threadID, curandState_t *state, int * roulette, int n);
+__device__ int rouletteSelect(curandState_t *state, int * roulette, int n);
 __global__ void gaKernel(curandState_t *states, population_t population, population_t buffer, int *roulette);
 
 static void cudaInitPopulation(population_t *hostPopulation, population_t *cudaPopulation) {
