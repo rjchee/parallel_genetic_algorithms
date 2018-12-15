@@ -8,7 +8,7 @@
 
 #include "CycleTimer.h"
 
-#define THREADS_PER_BLOCK 256
+#define THREADS_PER_BLOCK 512
 
 #define DEBUG
 #ifdef DEBUG
@@ -96,12 +96,13 @@ __device__ int evaluate(int threadID, population_t *population) {
     for (int i = startIdx; i < endIdx; i++) {
         sum += evaluateFitness(threadID, population, i);
     }
+    __shared__ int sums[THREADS_PER_BLOCK];
+    sums[threadID] = sum;
     __syncthreads();
-    for (int i = 0; i < startIdx; i++) {
-        sum += population->chromosomes[i].fitness;
-    }
-    for (int i = endIdx; i < population->numChromosomes; i++) {
-        sum += population->chromosomes[i].fitness;
+    for (int i = 0; i < THREADS_PER_BLOCK; i++) {
+        if (i != threadID) {
+            sum += sums[i];
+        }
     }
     return sum;
 }
@@ -219,7 +220,6 @@ __global__ void gaKernel(curandState_t *states, population_t *population, popula
         if (threadID == 0) {
             *totalFitness = population->totalFitness;
         }
-        __syncthreads();
         if (hasConverged) {
             printf("converged\n");
             break;
