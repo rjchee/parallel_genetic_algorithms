@@ -40,6 +40,7 @@ __device__ void printPopulation(population_t * population) {
         }
         printf("]\n");
     }
+    __syncthreads();
 }
 
 static population_t *cudaInitPopulation(population_t *hostPopulation) {
@@ -177,22 +178,21 @@ __device__ int rouletteSelect(curandState_t *state, int *roulette, int size) {
 __global__ void gaKernel(curandState_t *states, population_t *population, population_t *buffer, int *roulette, int num_generations, bool debug) {
     int threadID = blockDim.x * blockIdx.x + threadIdx.x;
     curandState_t threadState = states[threadID];
-    for (int generation = 0; generation < num_generations; generation++) {
-        generateOffsprings(threadID, &threadState, population, buffer, roulette);
-        __syncthreads();
-        if (threadID == 0) {
-            population_t *tmp = population;
-            population = buffer;
-            buffer = tmp;
-        }
-        __syncthreads();
-        if (converged(threadID, population)) {
-            break;
-        }
-        __syncthreads();
-        if (debug && threadID == 0) {
-            printPopulation(population);
-        }
+    generateOffsprings(threadID, &threadState, population, buffer, roulette);
+    __syncthreads();
+    if (threadID == 0) {
+        population_t *tmp = population;
+        population = buffer;
+        buffer = tmp;
+    }
+    __syncthreads();
+    if (converged(threadID, population)) {
+        printf("converged\n");
+        return;
+    }
+    __syncthreads();
+    if (debug && threadID == 0) {
+        printPopulation(population);
     }
 }
 
@@ -228,8 +228,10 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
 
     double startTime = CycleTimer::currentSeconds();
 
-    gaKernel<<<blocks, THREADS_PER_BLOCK>>>(states, cudaPopulation, cudaBuffer, cudaRoulette, num_generations, debug);
-    cudaThreadSynchronize();
+    for (int i = 0; i < num_generations; i++) {
+        gaKernel<<<blocks, THREADS_PER_BLOCK>>>(states, cudaPopulation, cudaBuffer, cudaRoulette, num_generations, debug);
+        cudaThreadSynchronize();
+    }
     int totalFitness;
     cudaMemcpy(&totalFitness, cudaResult, sizeof(int), cudaMemcpyDeviceToHost);
 
