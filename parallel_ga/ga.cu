@@ -56,7 +56,6 @@ __device__ void printPopulation(population_t * population) {
         }
         printf("]\n");
     }
-    __syncthreads();
 }
 
 static population_t *cudaInitPopulation(population_t *hostPopulation) {
@@ -86,6 +85,9 @@ __device__ int evaluate(int threadID, population_t *population) {
     int chromosomesPerThread = (population->numChromosomes + THREADS_PER_BLOCK - 1) / (THREADS_PER_BLOCK);
     int startIdx = threadID  * chromosomesPerThread;
     int endIdx = startIdx + chromosomesPerThread;
+    if (startIdx > population->numChromosomes) {
+        startIdx = population->numChromosomes;
+    }
     if (endIdx > population->numChromosomes) {
         endIdx = population->numChromosomes;
     }
@@ -209,22 +211,19 @@ __global__ void gaKernel(curandState_t *states, population_t *population, popula
     curandState_t threadState = states[threadID];
     for (int i = 0; i < num_generations; i++) {
         generateOffsprings(threadID, &threadState, population, buffer, roulette);
-        __syncthreads();
-        if (threadID == 0) {
-            population_t *tmp = population;
-            population = buffer;
-            buffer = tmp;
-        }
+        population_t *tmp = population;
+        population = buffer;
+        buffer = tmp;
         __syncthreads();
         bool hasConverged = converged(threadID, population, debug);
         if (threadID == 0) {
             *totalFitness = population->totalFitness;
         }
+        __syncthreads();
         if (hasConverged) {
             printf("converged\n");
             break;
         }
-        __syncthreads();
         if (debug && threadID == 0) {
             printPopulation(population);
         }
