@@ -15,7 +15,7 @@
 // TODO: check if buffer's mutationProb, numChromosomes, and numGenes are initialized correctly
 // TODO: store copies of heavily accessed shared memory to local memory
 
-static void cudaInitPopulation(population_t *hostPopulation, population_t);
+static void cudaInitPopulation(population_t *hostPopulation, population_t *cudaPopulation);
 __device__ bool converged(int threadID, population_t *population);
 __device__ int evaluate(population_t *population);
 __device__ int evaluateFitness(int threadID, population_t *population, int chromoIdx);
@@ -62,7 +62,7 @@ __device__ bool converged(int threadID, population_t *population) {
 __device__ int evaluateFitness(int threadID, population_t *population, int chromoIdx) {
     chromosome_t *chromosome = &population->chromosomes[chromoIdx];
     int startGene = chromosome->geneIdx;
-    int endGene = startGene + chromosome->numOfGenes;
+    int endGene = startGene + population->genesPerChromosome;
     int val = 0;
     for (int i = startGene; i < endGene; i++) {
         val += population->genes[i].val;
@@ -103,7 +103,7 @@ __device__ void crossover(curandState_t *state, population_t *population, popula
     chromosome_t *child1 = &buffer->chromosomes[index];
     chromosome_t *child2 = &buffer->chromosomes[index + 1];
 
-    int genesPerChromosome = parent1->numOfGenes;
+    int genesPerChromosome = population->genesPerChromosome;
     int crossoverIdx = (int)(curand_uniform(state) * genesPerChromosome);
     int c1 = child1->geneIdx;
     int c2 = child2->geneIdx;
@@ -198,7 +198,7 @@ void gaCuda(population_t *population, population_t *buffer) {
 
     double startTime = CycleTimer::currentSeconds();
 
-    gaKernel<<<blocks, THREADS_PER_BLOCKS>>>(states, cudaPopulation, cudaBuffer, cudaRoulette);
+    gaKernel<<<blocks, THREADS_PER_BLOCK>>>(states, cudaPopulation, cudaBuffer, cudaRoulette);
     cudaThreadSynchronize();
     int totalFitness;
     cudaMemcpy(cudaResult, &totalFitness, sizeof(int), cudaMemcpyDeviceToHost);

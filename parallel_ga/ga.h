@@ -6,7 +6,6 @@ typedef struct {
 } gene_t;
 
 typedef struct {
-    int numOfGenes;
     int fitness;
     int geneIdx;
 } chromosome_t;
@@ -14,7 +13,7 @@ typedef struct {
 typedef struct {
     double mutationProb;
     int numChromosomes;
-    int numGenes;
+    int genesPerChromosome;
     int totalFitness;
     chromosome_t *chromosomes;
     gene_t *genes;
