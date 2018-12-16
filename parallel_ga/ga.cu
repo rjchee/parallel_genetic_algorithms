@@ -208,7 +208,7 @@ __device__ int nextPow2(int n) {
 }
 
 
-__device__ void generateRoulette(int threadID, population_t * population, int *roulette) {
+__global__ void generateRoulette(int threadID, population_t * population, int *roulette) {
     /*
     int N = nextPow2(population->numChromosomes);
     for (int twod = 1; twod < N; twod *= 2) {
