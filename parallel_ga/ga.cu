@@ -232,6 +232,7 @@ __device__ void generateRoulette(int threadID, population_t * population, int *r
         }
     }
     __syncthreads();
+    // adapted from assignment 2 code
     // upsweep
     for (int twod = 1; twod < N; twod *= 2) {
         int twod1 = twod * 2;
