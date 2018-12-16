@@ -185,7 +185,7 @@ __device__ void crossover(curandState_t *state, population_t *population, popula
     }
 }
 
-__device__ int nextPow2(int n) {
+__host__ __device__ int nextPow2(int n) {
     n--;
     n |= n >> 1;
     n |= n >> 2;
