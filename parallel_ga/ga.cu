@@ -214,7 +214,7 @@ __device__ void generateRoulette(int threadID, population_t * population, int *r
         for (int i = 1; i < endIdx; i++) {
             roulette[i] = chromosomes[i - 1].fitness;
         }
-    } else if (endIdx >= numChromosomes) {
+    } else if (endIdx <= numChromosomes) {
         for (int i = startIdx; i < endIdx; i++) {
             roulette[i] = chromosomes[i - 1].fitness;
         }
@@ -232,6 +232,7 @@ __device__ void generateRoulette(int threadID, population_t * population, int *r
         }
     }
     __syncthreads();
+    // upsweep
     for (int twod = 1; twod < N; twod *= 2) {
         int twod1 = twod * 2;
         int idx = twod1 * threadID;
@@ -240,6 +241,11 @@ __device__ void generateRoulette(int threadID, population_t * population, int *r
         }
         __syncthreads();
     }
+    if (threadID == 0) {
+        roulette[N - 1] = 0;
+    }
+    __syncthreads();
+    // downsweep
     for (int twod = N / 2; twod >= 1; twod /= 2) {
         int twod1 = twod * 2;
         int idx1 = twod1 * threadID + twod1 - 1;
