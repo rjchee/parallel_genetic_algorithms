@@ -220,7 +220,6 @@ __global__ void gaKernel(curandState_t *states, population_t *population, popula
         if (threadID == 0) {
             *totalFitness = population->totalFitness;
         }
-        __syncthreads();
         if (hasConverged) {
             printf("converged\n");
             break;
