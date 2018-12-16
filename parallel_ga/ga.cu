@@ -208,7 +208,7 @@ __device__ int nextPow2(int n) {
 }
 
 
-__global__ void generateRoulette(int threadID, population_t * population, int *roulette) {
+__global__ void generateRoulette(population_t * population, int *roulette) {
     /*
     int N = nextPow2(population->numChromosomes);
     for (int twod = 1; twod < N; twod *= 2) {
@@ -312,7 +312,7 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
     double startTime = CycleTimer::currentSeconds();
 
     for (int gen = 0; gen < num_generations; gen++) {
-        generateRoulette<<<1, 1>>>(population, cudaRoulette);
+        generateRoulette<<<1, 1>>>(cudaPopulation, cudaRoulette);
         cudaCheckError( cudaThreadSynchronize() );
         generateOffsprings<<<THREADS_PER_BLOCK, 2>>>(states, cudaPopulation, cudaBuffer, cudaRoulette);
         cudaCheckError( cudaThreadSynchronize() );
