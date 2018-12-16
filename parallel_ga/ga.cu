@@ -197,7 +197,41 @@ __device__ int nextPow2(int n) {
 }
 
 __device__ void generateRoulette(int threadID, population_t * population, int *roulette) {
-    int N = nextPow2(population->numChromosomes);
+    int numChromosomes = population->numChromosomes;
+    int N = nextPow2(numChromosomes + 1);
+    int numsPerThread = (N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    int startIdx = threadID * numsPerThread;
+    if (startIdx > N) {
+        startIdx = N;
+    }
+    int endIdx = startIdx + numsPerThread;
+    if (endIdx > N) {
+        endIdx = N;
+    }
+    chromosome_t *chromosomes = population->chromosomes;
+    if (threadID == 0) {
+        roulette[0] = 0;
+        for (int i = 1; i < endIdx; i++) {
+            roulette[i] = chromosomes[i - 1].fitness;
+        }
+    } else if (endIdx >= numChromosomes) {
+        for (int i = startIdx; i < endIdx; i++) {
+            roulette[i] = chromosomes[i - 1].fitness;
+        }
+    } else if (startIdx + 1 >= numChromosomes) {
+        for (int i = startIdx; i < endIdx; i++) {
+            roulette[i] = 0;
+        }
+    } else {
+        for (int i = startIdx; i < endIdx; i++) {
+            if (i - 1 < numChromosomes) {
+                roulette[i] = chromosomes[i - 1].fitness;
+            } else {
+                roulette[i] = 0;
+            }
+        }
+    }
+    __syncthreads();
     for (int twod = 1; twod < N; twod *= 2) {
         int twod1 = twod * 2;
         int idx = twod1 * threadID;
@@ -282,7 +316,7 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
     // array holding the integers used in the roulette function used in
     // generating new offspring
     int *cudaRoulette;
-    int rouletteBytes = (population->numChromosomes + 1) * sizeof(int);
+    int rouletteBytes = nextPow2(population->numChromosomes + 1) * sizeof(int);
     cudaCheckError( cudaMalloc(&cudaRoulette, rouletteBytes) );
 
     curandState_t *states;
