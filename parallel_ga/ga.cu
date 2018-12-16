@@ -185,13 +185,85 @@ __device__ void crossover(curandState_t *state, population_t *population, popula
     }
 }
 
+__host__ __device__ int nextPow2(int n) {
+    n--;
+    n |= n >> 1;
+    n |= n >> 2;
+    n |= n >> 4;
+    n |= n >> 8;
+    n |= n >> 16;
+    n++;
+    return n;
+}
 
 __device__ void generateRoulette(int threadID, population_t * population, int *roulette) {
+    int numChromosomes = population->numChromosomes;
+    int N = nextPow2(numChromosomes + 1);
+    int numsPerThread = (N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    int startIdx = threadID * numsPerThread;
+    if (startIdx > N) {
+        startIdx = N;
+    }
+    int endIdx = startIdx + numsPerThread;
+    if (endIdx > N) {
+        endIdx = N;
+    }
+    chromosome_t *chromosomes = population->chromosomes;
+    if (threadID == 0) {
+        roulette[0] = 0;
+        for (int i = 1; i < endIdx; i++) {
+            roulette[i] = chromosomes[i - 1].fitness;
+        }
+    } else if (endIdx <= numChromosomes) {
+        for (int i = startIdx; i < endIdx; i++) {
+            roulette[i] = chromosomes[i - 1].fitness;
+        }
+    } else if (startIdx + 1 >= numChromosomes) {
+        for (int i = startIdx; i < endIdx; i++) {
+            roulette[i] = 0;
+        }
+    } else {
+        for (int i = startIdx; i < endIdx; i++) {
+            if (i - 1 < numChromosomes) {
+                roulette[i] = chromosomes[i - 1].fitness;
+            } else {
+                roulette[i] = 0;
+            }
+        }
+    }
+    __syncthreads();
+    // upsweep
+    for (int twod = 1; twod < N; twod *= 2) {
+        int twod1 = twod * 2;
+        int idx = twod1 * threadID;
+        if ((idx + twod1 - 1) < N) {
+            roulette[idx + twod1 - 1] += roulette[idx + twod - 1];
+        }
+        __syncthreads();
+    }
+    if (threadID == 0) {
+        roulette[N - 1] = 0;
+    }
+    __syncthreads();
+    // downsweep
+    for (int twod = N / 2; twod >= 1; twod /= 2) {
+        int twod1 = twod * 2;
+        int idx1 = twod1 * threadID + twod1 - 1;
+        int idx2 = twod1 * threadID + twod - 1;
+        if (idx1 < N) {
+            int tmp = roulette[idx2];
+            roulette[idx2] = roulette[idx1];
+            roulette[idx1] += tmp;
+        }
+        __syncthreads();
+    }
+    /*
     roulette[0] = 0;
     for (int i = 1; i <= population->numChromosomes; i++) {
         roulette[i] = roulette[i - 1] + population->chromosomes[i - 1].fitness;
         // printf("roulette: %d: %d, %d\n", i, roulette[i], (population->chromosomes)[i - 1].fitness);
     }
+    */
 }
 
 
@@ -204,7 +276,7 @@ __device__ int rouletteSelect(curandState_t *state, int *roulette, int size) {
         }
     }
 
-    return -1;
+    return size - 1;
 }
 
 __global__ void gaKernel(curandState_t *states, population_t *population, population_t *buffer, int *roulette, int *totalFitness, int num_generations, bool debug) {
@@ -246,7 +318,7 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
     // array holding the integers used in the roulette function used in
     // generating new offspring
     int *cudaRoulette;
-    int rouletteBytes = (population->numChromosomes + 1) * sizeof(int);
+    int rouletteBytes = nextPow2(population->numChromosomes + 1) * sizeof(int);
     cudaCheckError( cudaMalloc(&cudaRoulette, rouletteBytes) );
 
     curandState_t *states;
