@@ -5,6 +5,7 @@
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
 #include <driver_functions.h>
+#include <thrust/scan.h>
 
 #include "CycleTimer.h"
 
@@ -29,20 +30,20 @@ inline void cudaAssert(cudaError_t code, const char *file, int line, bool abort=
 // TODO: check if buffer's mutationProb, numChromosomes, and numGenes are initialized correctly
 // TODO: store copies of heavily accessed shared memory to local memory
 
-__device__ void printPopulation(population_t *population);
+__global__ void printPopulation(population_t *population);
 static population_t *cudaInitPopulation(population_t *hostPopulation);
-__device__ bool converged(int threadID, population_t *population, bool debug);
-__device__ int evaluate(population_t *population);
+//__device__ bool converged(int threadID, population_t *population, bool debug);
+__global__ int evaluate(population_t *population, int *result);
 __device__ int evaluateFitness(int threadID, population_t *population, int chromoIdx);
-__device__ void generateOffsprings(int threadID, curandState_t *state, population_t * population, population_t * buffer, int *roulette);
-__device__ void crossover(curandState_t *state, population_t *population, population_t *buffer, int index, int pc1, int pc2);
-__device__ void generateRoulette(int threadID, population_t * population, int *roulette);
+__global__ void generateOffsprings(int threadID, curandState_t *state, population_t * population, population_t * buffer, int *roulette);
+__device__ void crossover(int crossoverIdx, curandState_t *state, population_t *population, population_t *buffer, int index, int pc1, int pc2);
+__global__ void generateRoulette(population_t * population, int *roulette);
 __device__ int rouletteSelect(curandState_t *state, int * roulette, int n);
-__global__ void gaKernel(curandState_t *states, population_t *population, population_t *buffer, int *roulette, int *totalFitness, int num_generations, bool debug);
+//__global__ void gaKernel(curandState_t *states, population_t *population, population_t *buffer, int *roulette, int *totalFitness, int num_generations, bool debug);
 __global__ void setupCurand(curandState_t *state, unsigned long long seed_offset);
 
 
-__device__ void printPopulation(population_t * population) {
+__global__ void printPopulation(population_t * population) {
     chromosome_t *chromos = population->chromosomes;
     gene_t *genes = population->genes;
     int numChromosomes = population->numChromosomes;
@@ -81,8 +82,9 @@ static void cudaFreePopulation(population_t *cudaPopulation) {
     cudaCheckError( cudaFree(cudaPopulation) );
 }
 
-__device__ int evaluate(int threadID, population_t *population) {
-    int chromosomesPerThread = (population->numChromosomes + THREADS_PER_BLOCK - 1) / (THREADS_PER_BLOCK);
+__global__ void *evaluate(population_t *population, int *result) {
+    int threadID = threadIdx.x;
+    int chromosomesPerThread = (population->numChromosomes + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
     int startIdx = threadID  * chromosomesPerThread;
     int endIdx = startIdx + chromosomesPerThread;
     if (startIdx > population->numChromosomes) {
@@ -99,15 +101,18 @@ __device__ int evaluate(int threadID, population_t *population) {
     __shared__ int sums[THREADS_PER_BLOCK];
     sums[threadID] = sum;
     __syncthreads();
-    for (int i = 0; i < THREADS_PER_BLOCK; i++) {
-        if (i != threadID) {
-            sum += sums[i];
+    if (threadID == 0) {
+        for (int i = 0; i < THREADS_PER_BLOCK; i++) {
+            if (i != threadID) {
+                sum += sums[i];
+            }
         }
+        *result = sum;
     }
-    return sum;
 }
 
 
+/*
 __device__ bool converged(int threadID, population_t *population, bool debug) {
     int totalFitness = evaluate(threadID, population);
     if (debug) {
@@ -116,6 +121,7 @@ __device__ bool converged(int threadID, population_t *population, bool debug) {
     population->totalFitness = totalFitness;
     return totalFitness == population->numChromosomes * population->genesPerChromosome;
 }
+*/
 
 
 __device__ int evaluateFitness(int threadID, population_t *population, int chromoIdx) {
@@ -131,63 +137,104 @@ __device__ int evaluateFitness(int threadID, population_t *population, int chrom
 }
 
 
-__device__ void generateOffsprings(int threadID, curandState_t *state, population_t *population, population_t *buffer, int *roulette) {
-    if (threadID == 0) {
-        generateRoulette(threadID, population, roulette);
-    }
-    __syncthreads();
+__global__ void generateOffsprings(curandState_t *states, population_t *population, population_t *buffer, int *roulette) {
+    int threadID = blockIdx.x;
     // printf("generated roulette\n");
-    int iterationsPerThread = (population->numChromosomes / 2 + THREADS_PER_BLOCK - 1) / (THREADS_PER_BLOCK);
+    int iterationsPerThread = ((population->numChromosomes >> 1) + blockDim.x - 1) / blockDim.x;
     int startIdx = threadID * iterationsPerThread;
-    int endIdx = startIdx + iterationsPerThread;
-    if (endIdx > population->numChromosomes / 2) {
-        endIdx = population->numChromosomes / 2;
+    if (startIdx > (population->numChromosomes >> 1)) {
+        startIdx = population->numChromosomes >> 1;
     }
+    int endIdx = startIdx + iterationsPerThread;
+    if (endIdx > (population->numChromosomes >> 1)) {
+        endIdx = population->numChromosomes >> 1;
+    }
+    __shared__ int parents[2];
+    __shared__ int crossoverIndices[2];
+    curandState_t *state = states[threadID];
     for (int i = startIdx; i < endIdx; i++) {
-        int parent1 = rouletteSelect(state, roulette, population->numChromosomes);
-        int parent2 = rouletteSelect(state, roulette, population->numChromosomes);
+        parents[threadIdx.x] = rouletteSelect(state, roulette, population->numChromosomes);
+        bool gen = ((i - startIdx) & 1) == (startIdx & 1);
+        if (gen) {
+            crossoverIndices[threadIdx.x] = (int)(curand_uniform(state) * population->genesPerChromosome);
+        }
+        __syncthreads();
+        int crossoverIdx = crossoverIndices[(int)gen];
         // printf("crossover %d & %d to generate %d & %d\n", parent1, parent2, i, i + 1);
-        crossover(state, population, buffer, i * 2, parent1, parent2);
+        crossover(crossoverIdx, state, population, buffer, i << 1, parents[0], parent[1]);
     }
 }
 
 
-__device__ void crossover(curandState_t *state, population_t *population, population_t *buffer, int index, int pc1, int pc2) {
+__device__ void crossover(int crossoverIdx, curandState_t *state, population_t *population, population_t *buffer, int index, int pc1, int pc2) {
     chromosome_t *parent1 = &population->chromosomes[pc1];
     chromosome_t *parent2 = &population->chromosomes[pc2];
-    chromosome_t *child1 = &buffer->chromosomes[index];
-    chromosome_t *child2 = &buffer->chromosomes[index + 1];
+    chromosome_t *child = &buffer->chromosomes[index + threadIdx.x];
 
     int genesPerChromosome = population->genesPerChromosome;
-    int crossoverIdx = (int)(curand_uniform(state) * genesPerChromosome);
-    int c1 = child1->geneIdx;
-    int c2 = child2->geneIdx;
-    int p1 = parent1->geneIdx;
-    int p2 = parent2->geneIdx;
-    for (int i = 0; i < genesPerChromosome; i++, c1++, c2++, p1++, p2++) {
+    int c = child->geneIdx;
+    int p1, p2;
+    if (blockIdx.x == 0) {
+        p1 = parent1->geneIdx;
+        p2 = parent2->geneIdx;
+    } else {
+        p1 = parent2->geneIdx;
+        p2 = parent1->geneIdx;
+    }
+    for (int i = 0; i < genesPerChromosome; i++, c++, p1++, p2++) {
         if (i < crossoverIdx) {
-            buffer->genes[c1].val = population->genes[p1].val;
-            buffer->genes[c2].val = population->genes[p2].val;
+            buffer->genes[c].val = population->genes[p1].val;
         } else {
-            buffer->genes[c1].val = population->genes[p2].val;
-            buffer->genes[c2].val = population->genes[p1].val;
+            buffer->genes[c].val = population->genes[p2].val;
         }
 
         double r = (double) curand_uniform(state);
         if (r < population->mutationProb) {
-            buffer->genes[c1].val ^= 1;
-        }
-
-        r = (double) curand_uniform(state);
-        if (r < population->mutationProb) {
-            buffer->genes[c2].val ^= 1;
+            buffer->genes[c].val ^= 1;
         }
     }
 }
 
 
+__device__ int nextPow2(int n) {
+    n--;
+    n |= n >> 1;
+    n |= n >> 2;
+    n |= n >> 4;
+    n |= n >> 8;
+    n |= n >> 16;
+    n++;
+    return n;
+}
+
+
 __device__ void generateRoulette(int threadID, population_t * population, int *roulette) {
-    roulette[0] = 0;
+    /*
+    int N = nextPow2(population->numChromosomes);
+    for (int twod = 1; twod < N; twod *= 2) {
+        int twod1 = twod * 2;
+        int idx = twod1 * threadID;
+        if ((idx + twod1 - 1) < N) {
+            roulette[idx + twod1 - 1] += roulette[idx + twod - 1];
+        }
+        __syncthreads();
+    }
+    if (threadID == 0) {
+        roulette[N - 1] = 0;
+    }
+    __syncthreads();
+    for (int twod = N / 2; twod >= 1; twod /= 2) {
+        int twod1 = twod * 2;
+        int idx1 = twod1 * threadID + twod1 - 1;
+        int idx2 = twod1 * threadID + twod - 1;
+        if (idx1 < N) {
+            int tmp = roulette[idx2];
+            roulette[idx2] = roulette[idx1];
+            roulette[idx1] += tmp;
+        }
+        __syncthreads();
+    }
+    */
     for (int i = 1; i <= population->numChromosomes; i++) {
         roulette[i] = roulette[i - 1] + population->chromosomes[i - 1].fitness;
         // printf("roulette: %d: %d, %d\n", i, roulette[i], (population->chromosomes)[i - 1].fitness);
@@ -207,6 +254,7 @@ __device__ int rouletteSelect(curandState_t *state, int *roulette, int size) {
     return -1;
 }
 
+/*
 __global__ void gaKernel(curandState_t *states, population_t *population, population_t *buffer, int *roulette, int *totalFitness, int num_generations, bool debug) {
     int threadID = threadIdx.x;
     curandState_t threadState = states[threadID];
@@ -230,6 +278,7 @@ __global__ void gaKernel(curandState_t *states, population_t *population, popula
         }
     }
 }
+*/
 
 
 __global__ void setupCurand(curandState_t *state, unsigned long long seed_offset) {
@@ -239,8 +288,6 @@ __global__ void setupCurand(curandState_t *state, unsigned long long seed_offset
 
 
 void gaCuda(population_t *population, population_t *buffer, int num_generations, bool debug) {
-    const int numThreads = THREADS_PER_BLOCK;
-
     population_t *cudaPopulation = cudaInitPopulation(population);
     population_t *cudaBuffer = cudaInitPopulation(buffer);
 
@@ -259,14 +306,35 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
 
     int *cudaResult;
     cudaCheckError( cudaMalloc(&cudaResult, sizeof(int)) );
+    int totalFitness;
 
 
     double startTime = CycleTimer::currentSeconds();
 
+    for (int gen = 0; gen < num_generations; gen++) {
+        generateRoulette<<<1, 1>>>(population, roulette);
+        cudaCheckError( cudaThreadSynchronize() );
+        generateOffsprings<<<THREADS_PER_BLOCK, 2>>>(states, cudaPopulation, cudaBuffer, cudaRoulette);
+        cudaCheckError( cudaThreadSynchronize() );
+        population_t *tmp = cudaPopulation;
+        cudaPopulation = cudaBuffer;
+        cudaBuffer = tmp;
+        evaluate<<<1, THREADS_PER_BLOCK>>>(cudaPopulation, cudaResult);
+        cudaCheckError( cudaThreadSynchronize() );
+        cudaCheckError( cudaMemcpy(&totalFitness, cudaResult, sizeof(int)) );
+        if (totalFitness == population->numChromosomes * population->genesPerChromosome) {
+            printf("converged\n");
+            break;
+        }
+        if (debug) {
+            printPopulation<<<1, 1>>>(cudaPopulation);
+        }
+    }
+    /*
     gaKernel<<<1, THREADS_PER_BLOCK>>>(states, cudaPopulation, cudaBuffer, cudaRoulette, cudaResult, num_generations, debug);
     cudaCheckError( cudaThreadSynchronize() );
-    int totalFitness;
     cudaCheckError( cudaMemcpy(&totalFitness, cudaResult, sizeof(int), cudaMemcpyDeviceToHost) );
+    */
 
     double endTime = CycleTimer::currentSeconds();
 

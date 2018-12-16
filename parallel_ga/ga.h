@@ -14,7 +14,7 @@ typedef struct {
     double mutationProb;
     int numChromosomes;
     int genesPerChromosome;
-    int totalFitness;
+    //int totalFitness;
     chromosome_t *chromosomes;
     gene_t *genes;
 } population_t;
