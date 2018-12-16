@@ -41,4 +41,4 @@ Having trouble with Pages? Check out our [documentation](https://help.github.com
 
 - [Proposal](proposal.md) ([PDF](proposal.pdf))
 - [Checkpoint](checkpoint.md) ([PDF](checkpoint.pdf))
-- Final
+- [Final Report PDF](final_report.pdf)
