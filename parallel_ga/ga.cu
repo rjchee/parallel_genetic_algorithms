@@ -314,14 +314,17 @@ void gaCuda(population_t *population, population_t *buffer, int num_generations,
     for (int gen = 0; gen < num_generations; gen++) {
         generateRoulette<<<1, 1>>>(cudaPopulation, cudaRoulette);
         cudaCheckError( cudaThreadSynchronize() );
+        printf("generated roulette\n");
         generateOffsprings<<<THREADS_PER_BLOCK, 2>>>(states, cudaPopulation, cudaBuffer, cudaRoulette);
         cudaCheckError( cudaThreadSynchronize() );
+        printf("generated offspring\n");
         population_t *tmp = cudaPopulation;
         cudaPopulation = cudaBuffer;
         cudaBuffer = tmp;
         evaluate<<<1, THREADS_PER_BLOCK>>>(cudaPopulation, cudaResult);
         cudaCheckError( cudaThreadSynchronize() );
         cudaCheckError( cudaMemcpy(&totalFitness, cudaResult, sizeof(int), cudaMemcpyDeviceToHost) );
+        printf("evaluated: %d\n", totalFitness);
         if (totalFitness == population->numChromosomes * population->genesPerChromosome) {
             printf("converged\n");
             break;
